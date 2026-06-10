@@ -1,7 +1,7 @@
-"""后台版本检查模块
+"""Background version check module
 
-定期检查 PyPI 获取 cc-statistics 最新版本，缓存结果到本地文件。
-网络请求失败静默处理，不影响正常使用。
+Periodically checks PyPI for the latest cc-statistics version and caches the result locally.
+Network failures are silently handled and do not affect normal usage.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Optional
 
 from . import __version__
 
-# ── 常量 ──────────────────────────────────────────────────────────
+# ── Constants ──────────────────────────────────────────────────────────
 
 PACKAGE_NAME = "cc-statistics"
 PYPI_URL = f"https://pypi.org/pypi/{PACKAGE_NAME}/json"
@@ -28,20 +28,21 @@ CACHE_DIR = Path.home() / ".cc-stats"
 CACHE_FILE = CACHE_DIR / "version_cache.json"
 CONFIG_FILE = CACHE_DIR / "config.json"
 
-DEFAULT_CHECK_INTERVAL = 4 * 3600  # 4 小时（秒）
-REQUEST_TIMEOUT = 5  # 秒
+DEFAULT_CHECK_INTERVAL = 4 * 3600  # 4 hours (seconds)
+REQUEST_TIMEOUT = 5  # seconds
 
 
-# ── 安装方式检测 ─────────────────────────────────────────────────
+# ── Install method detection ─────────────────────────────────────────────────
 
 def _path_contains(path: str, needle: str) -> bool:
     return needle in path.replace(os.sep, "/")
 
 
 def detect_install_manager(prefix: str | None = None) -> str:
-    """Best-effort 判断当前包由哪种工具安装。
+    """Best-effort detection of which tool installed the current package.
 
-    返回值用于选择升级命令。只基于当前 Python 环境路径推断，不执行外部命令。
+    The return value is used to select the upgrade command. Inferred from the current
+    Python environment path only; no external commands are executed.
     """
     install_prefix = os.path.realpath(prefix or sys.prefix)
 
@@ -61,9 +62,10 @@ def _quote_command(parts: list[str]) -> str:
 
 
 def get_upgrade_command() -> str:
-    """返回适合当前安装方式的升级命令文本。
+    """Return the upgrade command text appropriate for the current installation method.
 
-    这是展示给用户看的命令；真正执行升级的地方仍应使用参数数组而不是 shell 字符串。
+    This is the command shown to the user; actual upgrade execution should still use
+    an argument array rather than a shell string.
     """
     manager = detect_install_manager()
     if manager == "uv-tool":
@@ -74,7 +76,7 @@ def get_upgrade_command() -> str:
 
 
 def get_install_info() -> dict[str, str]:
-    """导出 App 可读取的安装元信息。"""
+    """Export installation metadata readable by the app."""
     return {
         "version": __version__,
         "manager": detect_install_manager(),
@@ -85,11 +87,11 @@ def get_install_info() -> dict[str, str]:
     }
 
 
-# ── 数据结构 ──────────────────────────────────────────────────────
+# ── Data structures ──────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class VersionCache:
-    """版本缓存（不可变）"""
+    """Version cache (immutable)"""
     latest_version: str
     checked_at: float  # Unix timestamp
 
@@ -109,17 +111,17 @@ class VersionCache:
 
 @dataclass(frozen=True)
 class CheckResult:
-    """版本检查结果（不可变）"""
+    """Version check result (immutable)"""
     has_update: bool
     current_version: str
     latest_version: str
     upgrade_command: str = "pip install --upgrade cc-statistics"
 
 
-# ── 配置 ──────────────────────────────────────────────────────────
+# ── Configuration ──────────────────────────────────────────────────────────
 
 def load_config() -> dict:
-    """读取用户配置。返回新的 dict，不修改任何外部状态。"""
+    """Read user configuration. Returns a new dict without modifying any external state."""
     try:
         if CONFIG_FILE.exists():
             text = CONFIG_FILE.read_text(encoding="utf-8")
@@ -130,25 +132,25 @@ def load_config() -> dict:
 
 
 def is_auto_check_enabled() -> bool:
-    """判断是否启用自动版本检查（默认启用）"""
+    """Determine whether automatic version checking is enabled (enabled by default)"""
     config = load_config()
     return bool(config.get("auto_check_update", True))
 
 
 def get_check_interval() -> int:
-    """获取检查间隔（秒）"""
+    """Get check interval (seconds)"""
     config = load_config()
     interval = config.get("check_interval", DEFAULT_CHECK_INTERVAL)
     try:
-        return max(300, int(interval))  # 最少 5 分钟
+        return max(300, int(interval))  # minimum 5 minutes
     except (TypeError, ValueError):
         return DEFAULT_CHECK_INTERVAL
 
 
-# ── 缓存 ──────────────────────────────────────────────────────────
+# ── Cache ──────────────────────────────────────────────────────────
 
 def _read_cache() -> Optional[VersionCache]:
-    """读取缓存文件。失败返回 None，不抛异常。"""
+    """Read cache file. Returns None on failure without raising exceptions."""
     try:
         if CACHE_FILE.exists():
             text = CACHE_FILE.read_text(encoding="utf-8")
@@ -160,7 +162,7 @@ def _read_cache() -> Optional[VersionCache]:
 
 
 def _write_cache(cache: VersionCache) -> None:
-    """写入缓存文件。失败静默处理。"""
+    """Write cache file. Failures are silently handled."""
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         CACHE_FILE.write_text(
@@ -171,13 +173,13 @@ def _write_cache(cache: VersionCache) -> None:
         pass
 
 
-# ── 版本比较 ──────────────────────────────────────────────────────
+# ── Version comparison ──────────────────────────────────────────────────────
 
 def parse_version(version: str) -> tuple[int, ...]:
-    """将版本字符串解析为 int 元组，用于比较。
+    """Parse a version string into a tuple of ints for comparison.
 
-    例如 "0.10.3" → (0, 10, 3)
-    非数字部分视为 0。
+    e.g. "0.10.3" → (0, 10, 3)
+    Non-numeric parts are treated as 0.
     """
     parts: list[int] = []
     for part in version.strip().split("."):
@@ -189,14 +191,14 @@ def parse_version(version: str) -> tuple[int, ...]:
 
 
 def is_newer(remote: str, local: str) -> bool:
-    """判断 remote 版本是否比 local 版本更新"""
+    """Determine whether the remote version is newer than the local version"""
     return parse_version(remote) > parse_version(local)
 
 
-# ── 网络请求 ──────────────────────────────────────────────────────
+# ── Network requests ──────────────────────────────────────────────────────
 
 def fetch_latest_version() -> Optional[str]:
-    """从 PyPI 获取最新版本号。网络失败返回 None。"""
+    """Fetch the latest version number from PyPI. Returns None on network failure."""
     try:
         req = urllib.request.Request(
             PYPI_URL,
@@ -211,15 +213,15 @@ def fetch_latest_version() -> Optional[str]:
         return None
 
 
-# ── 主逻辑 ──────────────────────────────────────────────────────
+# ── Main logic ──────────────────────────────────────────────────────
 
 def check_for_update(force: bool = False) -> Optional[CheckResult]:
-    """检查是否有新版本。
+    """Check whether a new version is available.
 
-    - 如果自动检查被禁用且非强制，返回 None
-    - 如果缓存未过期且非强制，使用缓存结果
-    - 如果网络请求失败，静默返回 None
-    - 返回 CheckResult（不可变）或 None
+    - Returns None if auto-check is disabled and not forced
+    - Uses cached result if cache has not expired and not forced
+    - Silently returns None on network failure
+    - Returns CheckResult (immutable) or None
     """
     if not force and not is_auto_check_enabled():
         return None
@@ -228,12 +230,12 @@ def check_for_update(force: bool = False) -> Optional[CheckResult]:
     now = time.time()
     interval = get_check_interval()
 
-    # 检查缓存
+    # Check cache
     cache = _read_cache()
     if cache is not None and not force:
         elapsed = now - cache.checked_at
         if elapsed < interval:
-            # 缓存未过期，直接使用
+            # Cache not expired, use directly
             if is_newer(cache.latest_version, current):
                 return CheckResult(
                     has_update=True,
@@ -243,12 +245,12 @@ def check_for_update(force: bool = False) -> Optional[CheckResult]:
                 )
             return None
 
-    # 缓存过期或强制刷新，请求 PyPI
+    # Cache expired or forced refresh, request PyPI
     latest = fetch_latest_version()
     if latest is None:
         return None
 
-    # 写入新缓存
+    # Write new cache
     new_cache = VersionCache(latest_version=latest, checked_at=now)
     _write_cache(new_cache)
 
@@ -264,9 +266,9 @@ def check_for_update(force: bool = False) -> Optional[CheckResult]:
 
 
 def get_cached_update() -> Optional[CheckResult]:
-    """仅从缓存读取更新信息（不发起网络请求）。
+    """Read update information from cache only (no network request).
 
-    适用于 CLI 启动时快速提示，避免阻塞。
+    Suitable for quick prompts at CLI startup to avoid blocking.
     """
     cache = _read_cache()
     if cache is None:
@@ -284,8 +286,8 @@ def get_cached_update() -> Optional[CheckResult]:
 
 
 def format_update_message(result: CheckResult) -> str:
-    """格式化更新提示消息"""
+    """Format update notification message"""
     return (
-        f"cc-statistics v{result.latest_version} 已发布，"
-        f"运行 {result.upgrade_command} 更新"
+        f"cc-statistics v{result.latest_version} is available, "
+        f"run {result.upgrade_command} to upgrade"
     )

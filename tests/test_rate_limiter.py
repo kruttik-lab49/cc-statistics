@@ -1,4 +1,4 @@
-"""Usage Quota 预测器的单元测试"""
+"""Unit tests for the Usage Quota Predictor"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _make_session(messages: list[Message]) -> Session:
 
 
 def _ts(hour: int = 10, minute: int = 0) -> str:
-    """生成 ISO 格式时间戳"""
+    """Generate an ISO-format timestamp"""
     return f"2026-04-12T{hour:02d}:{minute:02d}:00+00:00"
 
 
@@ -35,7 +35,7 @@ def _make_stats_with_minutes(
     minute_data: dict[str, int],
     window_limit: int = DEFAULT_WINDOW_LIMIT,
 ) -> SessionStats:
-    """构造带 token_by_minute 的 SessionStats
+    """Build a SessionStats with token_by_minute populated
 
     minute_data: {"YYYY-MM-DD HH:MM": output_tokens}
     """
@@ -48,10 +48,10 @@ def _make_stats_with_minutes(
 
 
 class TestRateLimitStatus:
-    """测试 RateLimitStatus 状态分级"""
+    """Tests for RateLimitStatus status classification"""
 
     def test_safe_status(self):
-        """窗口使用 < 60% → safe"""
+        """Window usage < 60% → safe"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 2000,
             "2026-04-12 10:01": 3000,
@@ -63,7 +63,7 @@ class TestRateLimitStatus:
         assert result.window_used == 6000
 
     def test_warning_status(self):
-        """窗口使用 60% → warning（边界值）"""
+        """Window usage 60% → warning (boundary value)"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 8000,
             "2026-04-12 10:01": 8000,
@@ -76,7 +76,7 @@ class TestRateLimitStatus:
         assert result.pct == pytest.approx(0.60)
 
     def test_warning_status_above_60(self):
-        """窗口使用明确 > 60% → warning"""
+        """Window usage clearly > 60% → warning"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 10000,
             "2026-04-12 10:01": 10000,
@@ -88,7 +88,7 @@ class TestRateLimitStatus:
         assert result.pct <= 0.85
 
     def test_critical_status(self):
-        """窗口使用 > 85% → critical"""
+        """Window usage > 85% → critical"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 10000,
             "2026-04-12 10:01": 10000,
@@ -100,7 +100,7 @@ class TestRateLimitStatus:
         assert result.pct > 0.85
 
     def test_idle_no_data(self):
-        """没有 token_by_minute 数据 → idle"""
+        """No token_by_minute data → idle"""
         stats = SessionStats(session_id="test", project_path="/tmp/test")
         result = analyze_rate_limit(stats)
         assert result.status == "idle"
@@ -108,20 +108,20 @@ class TestRateLimitStatus:
         assert result.minutes_until_limit is None
 
     def test_custom_limit(self):
-        """自定义 limit 参数（Max 订阅）"""
+        """Custom limit parameter (Max subscription)"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 10000,
             "2026-04-12 10:01": 10000,
             "2026-04-12 10:02": 10000,
         })
-        # 默认 40000 → warning，但 80000 → safe
+        # Default 40000 → warning, but 80000 → safe
         result_default = analyze_rate_limit(stats, window_limit=40000)
         result_max = analyze_rate_limit(stats, window_limit=80000)
         assert result_default.pct > result_max.pct
         assert result_max.status == "safe"
 
     def test_minutes_until_limit(self):
-        """预测剩余时间计算"""
+        """Remaining time prediction calculation"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 5000,
             "2026-04-12 10:01": 5000,
@@ -133,7 +133,7 @@ class TestRateLimitStatus:
         assert abs(result.minutes_until_limit - 15.0) < 0.1
 
     def test_limit_reached(self):
-        """已达限额时 minutes_until_limit = 0"""
+        """minutes_until_limit = 0 when limit is reached"""
         stats = _make_stats_with_minutes({
             "2026-04-12 10:00": 10000,
             "2026-04-12 10:01": 10000,
@@ -146,25 +146,25 @@ class TestRateLimitStatus:
         assert result.status == "critical"
 
     def test_window_only_recent_5_minutes(self):
-        """只计算最近 5 分钟窗口内的数据"""
+        """Only data within the most recent 5-minute window is counted"""
         stats = _make_stats_with_minutes({
-            "2026-04-12 09:50": 20000,  # 超出窗口
-            "2026-04-12 09:55": 20000,  # 超出窗口
-            "2026-04-12 10:00": 1000,   # 窗口内
-            "2026-04-12 10:01": 1000,   # 窗口内
-            "2026-04-12 10:04": 1000,   # 窗口内（最新）
+            "2026-04-12 09:50": 20000,  # outside window
+            "2026-04-12 09:55": 20000,  # outside window
+            "2026-04-12 10:00": 1000,   # inside window
+            "2026-04-12 10:01": 1000,   # inside window
+            "2026-04-12 10:04": 1000,   # inside window (most recent)
         })
         result = analyze_rate_limit(stats, window_limit=40000)
-        # 窗口从 09:59 到 10:04，只含 10:00, 10:01, 10:04
+        # Window from 09:59 to 10:04, only includes 10:00, 10:01, 10:04
         assert result.window_used == 3000
         assert result.status == "safe"
 
 
 class TestTokenByMinuteExtraction:
-    """测试 analyzer 正确提取 token_by_minute"""
+    """Tests that the analyzer correctly extracts token_by_minute"""
 
     def test_token_by_minute_populated(self):
-        """assistant 消息的 token usage 按分钟归集"""
+        """token usage from assistant messages is bucketed by minute"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="hello"),
             Message(
@@ -183,14 +183,14 @@ class TestTokenByMinuteExtraction:
         ])
         stats = analyze_session(session)
         assert len(stats.token_by_minute) >= 2
-        # 总 output tokens
+        # Total output tokens
         total_output = sum(
             tu.output_tokens for tu in stats.token_by_minute.values()
         )
         assert total_output == 1300
 
     def test_token_by_minute_empty_no_usage(self):
-        """没有 usage 的消息不产生 token_by_minute"""
+        """Messages without usage do not produce token_by_minute entries"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="hello"),
             Message(role="assistant", timestamp=_ts(10, 1), content="hi"),
@@ -200,10 +200,10 @@ class TestTokenByMinuteExtraction:
 
 
 class TestTokenByMinuteMerge:
-    """测试 merge_stats 正确合并 token_by_minute"""
+    """Tests that merge_stats correctly merges token_by_minute"""
 
     def test_merge_combines_minutes(self):
-        """合并两个 session 的分钟数据"""
+        """Merges per-minute data from two sessions"""
         s1 = _make_stats_with_minutes({"2026-04-12 10:00": 1000})
         s2 = _make_stats_with_minutes({"2026-04-12 10:00": 2000, "2026-04-12 10:01": 500})
         merged = merge_stats([s1, s2])
@@ -211,7 +211,7 @@ class TestTokenByMinuteMerge:
         assert merged.token_by_minute["2026-04-12 10:01"].output_tokens == 500
 
     def test_merge_trims_to_30_minutes(self):
-        """合并后只保留最近 30 分钟"""
+        """After merging, only the most recent 30 minutes are retained"""
         minute_data = {f"2026-04-12 10:{i:02d}": 100 for i in range(35)}
         s1 = SessionStats(session_id="s1", project_path="/tmp/test")
         for key, val in minute_data.items():
@@ -221,10 +221,10 @@ class TestTokenByMinuteMerge:
 
 
 class TestFormatRateLimit:
-    """测试 format_rate_limit 输出"""
+    """Tests for format_rate_limit output"""
 
     def test_safe_format_contains_safe(self):
-        """safe 状态包含 SAFE 标签"""
+        """safe status contains SAFE label"""
         status = RateLimitStatus(
             status="safe",
             window_limit=40000,
@@ -238,7 +238,7 @@ class TestFormatRateLimit:
         assert "Usage Quota Forecast" in output
 
     def test_warning_format_contains_warning(self):
-        """warning 状态包含 WARNING 标签"""
+        """warning status contains WARNING label"""
         status = RateLimitStatus(
             status="warning",
             window_limit=40000,
@@ -251,7 +251,7 @@ class TestFormatRateLimit:
         assert "WARNING" in output
 
     def test_critical_format_contains_suggestion(self):
-        """critical 状态包含暂停建议"""
+        """critical status contains a pause suggestion"""
         status = RateLimitStatus(
             status="critical",
             window_limit=40000,
@@ -265,7 +265,7 @@ class TestFormatRateLimit:
         assert "Consider pausing" in output
 
     def test_idle_format(self):
-        """idle 状态返回空字符串"""
+        """idle status returns an empty string"""
         status = RateLimitStatus(
             status="idle",
             window_limit=40000,
@@ -278,7 +278,7 @@ class TestFormatRateLimit:
         assert output == ""
 
     def test_limit_reached_format(self):
-        """达到限额时显示 Consider pausing"""
+        """Shows Consider pausing when limit is reached"""
         status = RateLimitStatus(
             status="critical",
             window_limit=40000,
@@ -292,10 +292,10 @@ class TestFormatRateLimit:
 
 
 class TestCLIRateLimit:
-    """测试 --rate-limit CLI 参数解析"""
+    """Tests for --rate-limit CLI argument parsing"""
 
     def test_rate_limit_arg_parsed(self):
-        """--rate-limit 参数被正确解析"""
+        """--rate-limit argument is correctly parsed"""
         import argparse
 
         parser = argparse.ArgumentParser()
@@ -306,7 +306,7 @@ class TestCLIRateLimit:
         assert args.window_limit == 80000
 
     def test_default_limit(self):
-        """默认 window-limit 为 40000"""
+        """Default window-limit is 40000"""
         import argparse
 
         parser = argparse.ArgumentParser()

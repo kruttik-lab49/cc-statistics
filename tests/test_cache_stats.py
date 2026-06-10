@@ -1,4 +1,4 @@
-"""缓存命中率分析的单元测试"""
+"""Unit tests for cache hit rate analysis"""
 
 import os
 import pytest
@@ -11,11 +11,11 @@ from cc_stats.analyzer import (
 from cc_stats.formatter import format_cache_stats
 
 
-# ── compute_cache_stats 测试 ──────────────────────────────
+# ── compute_cache_stats tests ──────────────────────────────
 
 
 class TestComputeCacheStats:
-    """compute_cache_stats() 核心逻辑测试"""
+    """Core logic tests for compute_cache_stats()"""
 
     def test_no_cache_tokens_returns_na(self):
         """cache_read = 0 → grade = na"""
@@ -27,7 +27,7 @@ class TestComputeCacheStats:
         assert result.savings_usd == 0.0
 
     def test_excellent_grade(self):
-        """命中率 >= 80% → excellent"""
+        """Hit rate >= 80% → excellent"""
         tu = TokenUsage(input_tokens=200, cache_read_input_tokens=800)
         result = compute_cache_stats(tu, {"claude-sonnet-4-6-20250514": tu})
         assert result.grade == "excellent"
@@ -35,7 +35,7 @@ class TestComputeCacheStats:
         assert result.hit_rate == 0.8
 
     def test_good_grade(self):
-        """命中率 >= 60% → good"""
+        """Hit rate >= 60% → good"""
         tu = TokenUsage(input_tokens=400, cache_read_input_tokens=600)
         result = compute_cache_stats(tu, {"claude-sonnet-4-6-20250514": tu})
         assert result.grade == "good"
@@ -43,7 +43,7 @@ class TestComputeCacheStats:
         assert result.hit_rate == 0.6
 
     def test_fair_grade(self):
-        """命中率 >= 40% → fair"""
+        """Hit rate >= 40% → fair"""
         tu = TokenUsage(input_tokens=600, cache_read_input_tokens=400)
         result = compute_cache_stats(tu, {"claude-sonnet-4-6-20250514": tu})
         assert result.grade == "fair"
@@ -51,7 +51,7 @@ class TestComputeCacheStats:
         assert result.hit_rate == 0.4
 
     def test_poor_grade(self):
-        """命中率 < 40% → poor"""
+        """Hit rate < 40% → poor"""
         tu = TokenUsage(input_tokens=800, cache_read_input_tokens=200)
         result = compute_cache_stats(tu, {"claude-sonnet-4-6-20250514": tu})
         assert result.grade == "poor"
@@ -67,23 +67,23 @@ class TestComputeCacheStats:
         assert result.cache_read_tokens == 700_000
 
     def test_savings_usd_calculation(self):
-        """节省费用 = cache_read * (input_price - cache_read_price) / 1M"""
+        """savings = cache_read * (input_price - cache_read_price) / 1M"""
         tu = TokenUsage(input_tokens=200_000, cache_read_input_tokens=1_000_000)
         result = compute_cache_stats(tu, {"claude-sonnet-4-6-20250514": tu})
         # savings = 1_000_000 * (3.0 - 0.3) / 1_000_000 = $2.70
         assert result.savings_usd == pytest.approx(2.70)
 
     def test_gemini_model_no_savings(self):
-        """Gemini 模型不计算节省费用"""
+        """Gemini models do not compute savings"""
         tu = TokenUsage(input_tokens=200, cache_read_input_tokens=800)
         result = compute_cache_stats(tu, {"gemini-2.5-pro": tu})
         assert result.savings_usd == 0.0
-        # 但命中率仍然计算
+        # But hit rate is still computed
         assert result.hit_rate == 0.8
         assert result.grade == "excellent"
 
     def test_mixed_models_savings(self):
-        """混合模型：只对 Claude 模型计算节省费用"""
+        """Mixed models: savings computed only for Claude models"""
         claude_tu = TokenUsage(input_tokens=100, cache_read_input_tokens=500)
         gemini_tu = TokenUsage(input_tokens=100, cache_read_input_tokens=500)
         total_tu = TokenUsage(input_tokens=200, cache_read_input_tokens=1000)
@@ -93,12 +93,12 @@ class TestComputeCacheStats:
             "gemini-2.5-pro": gemini_tu,
         }
         result = compute_cache_stats(total_tu, by_model)
-        # 只算 claude 的 500 tokens
+        # Only count Claude's 500 tokens
         expected = 500 * (3.0 - 0.3) / 1_000_000
         assert result.savings_usd == pytest.approx(expected)
 
     def test_by_model_hit_rates(self):
-        """按模型拆分命中率"""
+        """Hit rates broken down by model"""
         model_a = TokenUsage(input_tokens=200, cache_read_input_tokens=800)
         model_b = TokenUsage(input_tokens=500, cache_read_input_tokens=500)
         total_tu = TokenUsage(input_tokens=700, cache_read_input_tokens=1300)
@@ -110,7 +110,7 @@ class TestComputeCacheStats:
         assert result.by_model["model-b"] == pytest.approx(0.5)
 
     def test_by_model_excludes_zero_cache(self):
-        """by_model 不包含 cache_read = 0 的模型"""
+        """by_model does not include models with cache_read = 0"""
         model_a = TokenUsage(input_tokens=200, cache_read_input_tokens=800)
         model_b = TokenUsage(input_tokens=500, cache_read_input_tokens=0)
         total_tu = TokenUsage(input_tokens=700, cache_read_input_tokens=800)
@@ -122,52 +122,52 @@ class TestComputeCacheStats:
         assert "model-b" not in result.by_model
 
     def test_boundary_80_percent(self):
-        """边界：刚好 80% → excellent"""
+        """Boundary: exactly 80% → excellent"""
         tu = TokenUsage(input_tokens=200, cache_read_input_tokens=800)
         result = compute_cache_stats(tu, {})
         assert result.grade == "excellent"
 
     def test_boundary_just_below_80(self):
-        """边界：略低于 80% → good"""
+        """Boundary: just below 80% → good"""
         tu = TokenUsage(input_tokens=201, cache_read_input_tokens=799)
         result = compute_cache_stats(tu, {})
         assert result.grade == "good"
 
     def test_boundary_60_percent(self):
-        """边界：刚好 60% → good"""
+        """Boundary: exactly 60% → good"""
         tu = TokenUsage(input_tokens=400, cache_read_input_tokens=600)
         result = compute_cache_stats(tu, {})
         assert result.grade == "good"
 
     def test_boundary_40_percent(self):
-        """边界：刚好 40% → fair"""
+        """Boundary: exactly 40% → fair"""
         tu = TokenUsage(input_tokens=600, cache_read_input_tokens=400)
         result = compute_cache_stats(tu, {})
         assert result.grade == "fair"
 
 
-# ── format_cache_stats 测试 ───────────────────────────────
+# ── format_cache_stats tests ──────────────────────────────
 
 
 class TestFormatCacheStats:
-    """format_cache_stats() 输出格式测试"""
+    """Output format tests for format_cache_stats()"""
 
     @pytest.fixture(autouse=True)
     def disable_color(self, monkeypatch):
         monkeypatch.setenv("NO_COLOR", "1")
-        # 重新加载模块以更新 _COLOR
+        # Reload the module to update _COLOR
         import cc_stats.formatter as fmt
         fmt._COLOR = False
 
     def test_na_output(self):
-        """N/A 等级输出"""
+        """N/A grade output"""
         cache = CacheStats()
         output = format_cache_stats(cache)
         assert "N/A" in output
         assert "No cache data available" in output
 
     def test_excellent_output(self):
-        """Excellent 等级输出"""
+        """Excellent grade output"""
         cache = CacheStats(
             hit_rate=0.85,
             grade="excellent",
@@ -183,7 +183,7 @@ class TestFormatCacheStats:
         assert "$2.30" in output
 
     def test_poor_output(self):
-        """Poor 等级输出"""
+        """Poor grade output"""
         cache = CacheStats(
             hit_rate=0.2,
             grade="poor",
@@ -198,7 +198,7 @@ class TestFormatCacheStats:
         assert "Low cache hit rate" in output
 
     def test_multi_model_output(self):
-        """多模型时显示按模型拆分"""
+        """Multi-model output shows per-model breakdown"""
         cache = CacheStats(
             hit_rate=0.7,
             grade="good",
@@ -216,7 +216,7 @@ class TestFormatCacheStats:
         assert "55.0%" in output
 
     def test_single_model_no_breakdown(self):
-        """单模型不显示按模型拆分"""
+        """Single model does not show per-model breakdown"""
         cache = CacheStats(
             hit_rate=0.9,
             grade="excellent",
@@ -230,7 +230,7 @@ class TestFormatCacheStats:
         assert "按模型" not in output
 
     def test_zero_savings_not_shown(self):
-        """savings = 0 时不显示节省费用"""
+        """savings = 0 does not show cost savings"""
         cache = CacheStats(
             hit_rate=0.8,
             grade="excellent",

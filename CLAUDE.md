@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-cc-statistics — CLI 工具，用于统计 Claude Code 会话的 AI Coding 工程指标。
+cc-statistics — CLI tool for computing AI coding engineering metrics from Claude Code sessions.
 
-数据源：`~/.claude/projects/` 下的 JSONL 会话文件。
+Data source: JSONL session files under `~/.claude/projects/`.
 
 ## Setup
 
@@ -19,49 +19,51 @@ pip install -e .
 ## Usage
 
 ```bash
-cc-stats --list              # 列出所有项目
-cc-stats                     # 分析当前目录项目
-cc-stats <project-keyword>   # 按关键词匹配项目
-cc-stats <path/to/file.jsonl> # 分析指定 JSONL
-cc-stats --all               # 分析所有项目
-cc-stats --last N            # 只看最近 N 个会话
+cc-stats --list              # List all projects
+cc-stats                     # Analyze the current directory project
+cc-stats <project-keyword>   # Match project by keyword
+cc-stats <path/to/file.jsonl> # Analyze a specific JSONL file
+cc-stats --all               # Analyze all projects
+cc-stats --last N            # Only show the most recent N sessions
 ```
 
 ## Architecture
 
-- `cc_stats/parser.py` — 解析 JSONL 为 Session/Message 数据结构
-- `cc_stats/analyzer.py` — 从 Session 计算 5 项工程指标（指令数、工具调用、时长、代码行数、token）
-- `cc_stats/formatter.py` — 将统计结果格式化为终端表格输出
-- `cc_stats/cli.py` — argparse CLI 入口，负责文件发现和参数处理
+- `cc_stats/parser.py` — Parse JSONL into Session/Message data structures
+- `cc_stats/analyzer.py` — Compute 5 engineering metrics from a Session (instruction count, tool calls, duration, lines of code, tokens)
+- `cc_stats/formatter.py` — Format statistics results as terminal table output
+- `cc_stats/cli.py` — argparse CLI entry point, handles file discovery and argument processing
+- `cc_stats_web/server.py` — ThreadingHTTPServer serving the web dashboard and JSON API
+- `cc_stats_web/web/index.html` — Single-file dark-themed web dashboard (vanilla JS, no build step)
 
 ## Key conventions
 
-- 纯 Python stdlib，无第三方依赖
-- 用户消息判定：`type == "user"` 且 `is_tool_result == False` 且 `is_meta == False`
-- 活跃时间：消息间隔 ≤ 5 分钟视为活跃
-- 代码行数来自 Edit/Write 工具调用的 input 参数
+- Pure Python stdlib, no third-party dependencies
+- User message criteria: `type == "user"` AND `is_tool_result == False` AND `is_meta == False`
+- Active time: message gaps <= 5 minutes count as active
+- Lines of code come from the `input` parameters of Edit/Write tool calls
 
-## Code Review 规范
+## Code Review Standards
 
-所有代码变更（包括社区 PR）在合并前必须通过以下安全和性能检查。
+All code changes (including community PRs) must pass the following security and performance checks before merging.
 
-### 安全检查清单
+### Security Checklist
 
-- [ ] **Shell/Script 注入防护**：所有拼接到 AppleScript、shell command、osascript 的字符串必须转义（反斜杠、双引号等特殊字符）。禁止直接字符串插值到脚本模板中
-- [ ] **外部输入不可信**：文件名、项目名、路径等来自用户或文件系统的值，不可直接拼入命令或脚本。必须经过清洗或转义
-- [ ] **JSONL 解析防御**：解析外部 JSONL 文件时，对缺失字段、类型不匹配、格式异常做防御性处理，不可因单条脏数据导致整体崩溃
-- [ ] **无硬编码敏感信息**：代码中不包含 API key、token、密码等敏感信息
+- [ ] **External input is untrusted**: File names, project names, paths, and other values from users or the filesystem must not be concatenated directly into commands or scripts. They must be sanitized or escaped first.
+- [ ] **Path traversal**: Query parameters used to construct filesystem paths (e.g. `?project=` in the web API) must be validated to reject `..`, `/`, and `\` before joining with `pathlib`.
+- [ ] **Defensive JSONL parsing**: When parsing external JSONL files, handle missing fields, type mismatches, and malformed data defensively. A single dirty record must not crash the entire process.
+- [ ] **No hardcoded sensitive information**: Code must not contain API keys, tokens, passwords, or other sensitive data.
 
-### 性能检查清单
+### Performance Checklist
 
-- [ ] **禁止循环中同步子进程**：不可在 for 循环内调用 `Process()`/`subprocess` 等同步外部命令。如需批量执行，使用批处理或异步方式
-- [ ] **时间复杂度评估**：对遍历全量 sessions/messages 的逻辑，评估时间复杂度。避免 O(N²) 或更高复杂度的嵌套循环；优先使用单次遍历 + 分桶/索引
-- [ ] **IO 密集操作需异步或缓存**：磁盘读取、文件遍历等 IO 操作应考虑缓存策略，避免重复读取。大量文件操作应在后台线程执行
-- [ ] **避免不必要的全量重算**：筛选条件变更时，如果数据源未变，应复用缓存而非重新加载
+- [ ] **No synchronous subprocesses in loops**: `Process()` / `subprocess` and similar synchronous external commands must not be called inside `for` loops. Use batch processing or async approaches for bulk execution.
+- [ ] **Time complexity evaluation**: For logic that iterates over all sessions/messages, evaluate the time complexity. Avoid O(N²) or higher nested loops; prefer single-pass + bucketing/indexing.
+- [ ] **Async or caching for IO-heavy operations**: Disk reads, file traversals, and similar IO operations should use a caching strategy to avoid repeated reads. Large file operations should run on a background thread.
+- [ ] **Avoid unnecessary full recomputation**: When filter conditions change but the data source has not, reuse cached results rather than reloading from scratch.
 
-### PR Review 流程
+### PR Review Process
 
-1. **自动检查**：PR 提交后，CI 必须通过编译检查
-2. **安全审查**：涉及字符串拼接、外部输入处理、命令执行的变更，必须逐行确认转义和清洗
-3. **性能审查**：涉及数据遍历、子进程调用、IO 操作的变更，必须评估大数据量下的表现
-4. **社区 PR 额外要求**：社区贡献者的 PR 需项目维护者 approve 后方可合并，重点关注安全和性能两项
+1. **Automated checks**: CI must pass compilation checks after a PR is submitted.
+2. **Security review**: Changes involving string concatenation, external input handling, or command execution must be reviewed line-by-line to confirm escaping and sanitization.
+3. **Performance review**: Changes involving data traversal, subprocess calls, or IO operations must be evaluated for behavior under large data volumes.
+4. **Additional requirements for community PRs**: PRs from community contributors require project maintainer approval before merging, with a focus on the security and performance items above.

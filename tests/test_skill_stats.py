@@ -1,4 +1,4 @@
-"""Skill 使用统计功能的单元测试"""
+"""Unit tests for Skill usage statistics"""
 
 from __future__ import annotations
 
@@ -27,15 +27,15 @@ def _make_session(messages: list[Message]) -> Session:
 
 
 def _ts(hour: int = 10, minute: int = 0, day: int = 15) -> str:
-    """生成 ISO 格式时间戳"""
+    """Generate an ISO-format timestamp"""
     return f"2026-03-{day:02d}T{hour:02d}:{minute:02d}:00+00:00"
 
 
 class TestSkillStatsExtraction:
-    """测试 analyzer 从 Session 中正确提取 Skill 统计"""
+    """Tests that the analyzer correctly extracts Skill statistics from a Session"""
 
     def test_no_skill_calls(self):
-        """无 Skill 调用时 skill_stats 为空"""
+        """skill_stats is empty when there are no Skill calls"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="hello"),
             Message(
@@ -51,7 +51,7 @@ class TestSkillStatsExtraction:
         assert stats.skill_stats == {}
 
     def test_single_skill_call_success(self):
-        """单个 Skill 调用，成功"""
+        """Single Skill call, success"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="run commit"),
             Message(
@@ -79,7 +79,7 @@ class TestSkillStatsExtraction:
         assert su.unknown_count == 0
 
     def test_single_skill_call_error(self):
-        """单个 Skill 调用，失败"""
+        """Single Skill call, failure"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="run commit"),
             Message(
@@ -105,7 +105,7 @@ class TestSkillStatsExtraction:
         assert su.error_count == 1
 
     def test_skill_call_no_result(self):
-        """Skill 调用无对应的 tool_result → unknown"""
+        """Skill call with no matching tool_result → unknown"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="hi"),
             Message(
@@ -124,7 +124,7 @@ class TestSkillStatsExtraction:
         assert su.success_count == 0
 
     def test_skill_call_no_tool_use_id(self):
-        """Skill 调用无 tool_use_id → unknown"""
+        """Skill call with no tool_use_id → unknown"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="hi"),
             Message(
@@ -141,7 +141,7 @@ class TestSkillStatsExtraction:
         assert su.unknown_count == 1
 
     def test_multiple_skills(self):
-        """多个不同 Skill 调用"""
+        """Multiple different Skill calls"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="go"),
             Message(
@@ -173,7 +173,7 @@ class TestSkillStatsExtraction:
         assert stats.skill_stats["review-pr"].error_count == 1
 
     def test_empty_skill_name(self):
-        """Skill 调用 skill 参数为空 → 使用 'unknown'"""
+        """Skill call with empty skill parameter → uses 'unknown'"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="go"),
             Message(
@@ -190,10 +190,10 @@ class TestSkillStatsExtraction:
 
 
 class TestSkillStatsTimeDistribution:
-    """测试时间分布统计"""
+    """Tests for time distribution statistics"""
 
     def test_hourly_distribution(self):
-        """按小时分布（UTC 时间转为本地时间后统计）"""
+        """Hourly distribution (UTC time converted to local time before bucketing)"""
         session = _make_session([
             Message(role="user", timestamp=_ts(9, 0), content="go"),
             Message(
@@ -209,13 +209,13 @@ class TestSkillStatsTimeDistribution:
         ])
         stats = analyze_session(session)
         su = stats.skill_stats["commit"]
-        # 验证分布数据存在且合计正确（具体小时取决于本地时区）
+        # Verify distribution data exists and sums correctly (specific hour depends on local timezone)
         assert sum(su.hourly_dist.values()) == 3
-        # 应该有 2 个不同的小时桶（9:30 和 14:00/14:30）
+        # Should have 2 distinct hour buckets (9:30 and 14:00/14:30)
         assert len(su.hourly_dist) == 2
 
     def test_daily_distribution(self):
-        """按天分布"""
+        """Daily distribution"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0, day=15), content="go"),
             Message(
@@ -235,10 +235,10 @@ class TestSkillStatsTimeDistribution:
 
 
 class TestSkillStatsMerge:
-    """测试 merge_stats 对 skill_stats 的合并"""
+    """Tests for merge_stats merging of skill_stats"""
 
     def test_merge_skill_stats(self):
-        """合并两个会话的 skill 统计"""
+        """Merge skill statistics from two sessions"""
         s1 = SessionStats(session_id="s1", project_path="/tmp")
         s1.skill_stats["commit"] = SkillUsage(
             name="commit", call_count=3, success_count=2, error_count=1,
@@ -267,7 +267,7 @@ class TestSkillStatsMerge:
         assert merged.skill_stats["review-pr"].call_count == 1
 
     def test_merge_empty_skill_stats(self):
-        """合并空 skill 统计"""
+        """Merge empty skill statistics"""
         s1 = SessionStats(session_id="s1", project_path="/tmp")
         s2 = SessionStats(session_id="s2", project_path="/tmp")
         merged = merge_stats([s1, s2])
@@ -275,16 +275,16 @@ class TestSkillStatsMerge:
 
 
 class TestFormatSkillStats:
-    """测试 format_skill_stats 的输出"""
+    """Tests for format_skill_stats output"""
 
     def test_no_skills(self):
-        """无 skill 数据时输出提示"""
+        """Shows a prompt when there is no skill data"""
         stats = SessionStats(session_id="test", project_path="/tmp")
         output = format_skill_stats(stats)
         assert "未发现 Skill 调用记录" in output
 
     def test_with_skills(self):
-        """有 skill 数据时输出包含关键信息"""
+        """Output contains key information when skill data is present"""
         stats = SessionStats(session_id="test", project_path="/tmp/project")
         stats.start_time = datetime(2026, 3, 15, 10, 0, tzinfo=timezone.utc)
         stats.end_time = datetime(2026, 3, 15, 12, 0, tzinfo=timezone.utc)
@@ -310,12 +310,12 @@ class TestFormatSkillStats:
         assert "review-pr" in output
         assert "会话数" in output
         assert "3" in output
-        # 成功率
+        # success rate
         assert "80%" in output  # commit: 4/5 = 80%
         assert "100%" in output  # review-pr: 2/2 = 100%
 
     def test_format_skill_stats_unknown_only(self):
-        """所有调用都是 unknown 时，成功率显示 N/A"""
+        """Success rate shows N/A when all calls are unknown"""
         stats = SessionStats(session_id="test", project_path="/tmp")
         stats.skill_stats["commit"] = SkillUsage(
             name="commit", call_count=3, unknown_count=3,
@@ -325,10 +325,10 @@ class TestFormatSkillStats:
 
 
 class TestToolCallCountsBackwardCompat:
-    """验证 --skills 不影响现有 tool_call_counts 行为"""
+    """Verify --skills does not affect existing tool_call_counts behavior"""
 
     def test_skill_still_in_tool_call_counts(self):
-        """Skill 调用仍然计入 tool_call_counts（向后兼容）"""
+        """Skill calls are still counted in tool_call_counts (backward-compatible)"""
         session = _make_session([
             Message(role="user", timestamp=_ts(10, 0), content="go"),
             Message(
@@ -348,20 +348,20 @@ class TestToolCallCountsBackwardCompat:
 
 
 class TestParserToolUseId:
-    """测试 parser 正确提取 tool_use_id 和 tool_results"""
+    """Tests that the parser correctly extracts tool_use_id and tool_results"""
 
     def test_tool_call_has_tool_use_id(self):
-        """ToolCall 包含 tool_use_id"""
+        """ToolCall contains tool_use_id"""
         tc = ToolCall(name="Skill", input={"skill": "commit"}, timestamp="t1", tool_use_id="tu_123")
         assert tc.tool_use_id == "tu_123"
 
     def test_tool_call_default_empty_id(self):
-        """ToolCall 默认 tool_use_id 为空"""
+        """ToolCall defaults to empty tool_use_id"""
         tc = ToolCall(name="Skill", input={"skill": "commit"}, timestamp="t1")
         assert tc.tool_use_id == ""
 
     def test_message_tool_results(self):
-        """Message.tool_results 存储 tool_use_id -> is_error 映射"""
+        """Message.tool_results stores tool_use_id -> is_error mapping"""
         msg = Message(
             role="user",
             timestamp="t1",

@@ -1,4 +1,4 @@
-"""Usage Quota 预测器 — 基于滑动窗口的用量额度分析"""
+"""Usage Quota Predictor — sliding-window usage quota analysis"""
 
 from __future__ import annotations
 
@@ -7,20 +7,20 @@ from datetime import datetime, timedelta
 
 from .analyzer import SessionStats
 
-# 默认限制：Claude Pro Sonnet 系列 5 分钟滑动窗口
+# Default limit: Claude Pro Sonnet series 5-minute sliding window
 DEFAULT_WINDOW_LIMIT = 40_000  # output tokens / 5 min
 DEFAULT_WINDOW_MINUTES = 5
 
 
 @dataclass
 class RateLimitStatus:
-    """用量额度状态"""
+    """Usage quota status"""
     status: str          # "safe" | "warning" | "critical" | "idle"
-    window_limit: int    # 5 分钟窗口 limit（默认 40000）
-    window_used: int     # 5 分钟内已用 output tokens
+    window_limit: int    # 5-minute window limit (default 40000)
+    window_used: int     # output tokens used within the 5-minute window
     pct: float           # window_used / window_limit (0.0 ~ 1.0+)
-    rate_per_min: float  # tokens/min（最近窗口内）
-    minutes_until_limit: float | None  # None = 不会触发
+    rate_per_min: float  # tokens/min (within the recent window)
+    minutes_until_limit: float | None  # None = limit will not be reached
 
 
 def analyze_rate_limit(
@@ -28,12 +28,12 @@ def analyze_rate_limit(
     window_limit: int = DEFAULT_WINDOW_LIMIT,
     window_minutes: int = DEFAULT_WINDOW_MINUTES,
 ) -> RateLimitStatus:
-    """基于 token_by_minute 数据计算用量额度预测
+    """Compute usage quota forecast based on token_by_minute data
 
     Args:
-        stats: 会话统计结果（需要 token_by_minute 数据）
-        window_limit: 滑动窗口的 output token 上限
-        window_minutes: 滑动窗口大小（分钟）
+        stats: Session stats result (requires token_by_minute data)
+        window_limit: Maximum output tokens allowed in the sliding window
+        window_minutes: Sliding window size (minutes)
     """
     if not stats.token_by_minute:
         return RateLimitStatus(
@@ -45,7 +45,7 @@ def analyze_rate_limit(
             minutes_until_limit=None,
         )
 
-    # 找到数据中最新的时间点作为窗口终点
+    # Find the most recent time point in the data as the window end
     sorted_keys = sorted(stats.token_by_minute.keys())
     latest_key = sorted_keys[-1]
 
@@ -61,11 +61,11 @@ def analyze_rate_limit(
             minutes_until_limit=None,
         )
 
-    # 窗口起点（不含）：latest - window_minutes
+    # Window start (exclusive): latest - window_minutes
     window_start_dt = latest_dt - timedelta(minutes=window_minutes)
     window_start_key = window_start_dt.strftime("%Y-%m-%d %H:%M")
 
-    # 累加窗口内的 output tokens
+    # Accumulate output tokens within the window
     window_used = 0
     active_minutes = 0
     for key in sorted_keys:
@@ -86,7 +86,7 @@ def analyze_rate_limit(
     pct = window_used / window_limit if window_limit > 0 else 0.0
     rate_per_min = window_used / window_minutes
 
-    # 预测剩余时间
+    # Predict remaining time
     remaining = window_limit - window_used
     if rate_per_min > 0 and remaining > 0:
         minutes_until_limit = remaining / rate_per_min
@@ -95,7 +95,7 @@ def analyze_rate_limit(
     else:
         minutes_until_limit = None
 
-    # 状态分级
+    # Status classification
     if pct >= 0.85:
         status = "critical"
     elif pct >= 0.60:

@@ -1,4 +1,4 @@
-"""version_checker 模块的单元测试"""
+"""Unit tests for the version_checker module"""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from cc_stats.version_checker import (
 
 
 class TestParseVersion(unittest.TestCase):
-    """版本号解析测试"""
+    """Version string parsing tests"""
 
     def test_simple_version(self) -> None:
         self.assertEqual(parse_version("1.2.3"), (1, 2, 3))
@@ -44,7 +44,7 @@ class TestParseVersion(unittest.TestCase):
         self.assertEqual(parse_version("  1.2.3  "), (1, 2, 3))
 
     def test_non_numeric_part(self) -> None:
-        # "1.2.beta" → beta 解析为 0
+        # "1.2.beta" → beta is parsed as 0
         self.assertEqual(parse_version("1.2.beta"), (1, 2, 0))
 
     def test_empty_string(self) -> None:
@@ -52,7 +52,7 @@ class TestParseVersion(unittest.TestCase):
 
 
 class TestIsNewer(unittest.TestCase):
-    """版本比较测试"""
+    """Version comparison tests"""
 
     def test_newer_patch(self) -> None:
         self.assertTrue(is_newer("1.0.1", "1.0.0"))
@@ -80,7 +80,7 @@ class TestIsNewer(unittest.TestCase):
 
 
 class TestInstallManager(unittest.TestCase):
-    """安装方式检测测试"""
+    """Install manager detection tests"""
 
     def test_detects_uv_tool(self) -> None:
         prefix = "/Users/ken/.local/share/uv/tools/cc-statistics"
@@ -113,7 +113,7 @@ class TestInstallManager(unittest.TestCase):
 
 
 class TestVersionCache(unittest.TestCase):
-    """缓存数据结构测试"""
+    """Cache data structure tests"""
 
     def test_frozen_dataclass(self) -> None:
         cache = VersionCache(latest_version="1.0.0", checked_at=1000.0)
@@ -144,7 +144,7 @@ class TestVersionCache(unittest.TestCase):
 
 
 class TestCheckResult(unittest.TestCase):
-    """检查结果数据结构测试"""
+    """Check result data structure tests"""
 
     def test_frozen_dataclass(self) -> None:
         result = CheckResult(
@@ -165,7 +165,7 @@ class TestCheckResult(unittest.TestCase):
 
 
 class TestReadCache(unittest.TestCase):
-    """缓存读取测试"""
+    """Cache read tests"""
 
     @patch("cc_stats.version_checker.CACHE_FILE")
     def test_read_valid_cache(self, mock_file: MagicMock) -> None:
@@ -198,7 +198,7 @@ class TestReadCache(unittest.TestCase):
 
 
 class TestWriteCache(unittest.TestCase):
-    """缓存写入测试"""
+    """Cache write tests"""
 
     @patch("cc_stats.version_checker.CACHE_FILE")
     @patch("cc_stats.version_checker.CACHE_DIR")
@@ -216,12 +216,12 @@ class TestWriteCache(unittest.TestCase):
     def test_write_os_error_silent(self, mock_dir: MagicMock, mock_file: MagicMock) -> None:
         mock_dir.mkdir.side_effect = OSError("read-only filesystem")
         cache = VersionCache(latest_version="1.0.0", checked_at=1000.0)
-        # 应该不抛异常
+        # Should not raise an exception
         _write_cache(cache)
 
 
 class TestConfig(unittest.TestCase):
-    """配置读取测试"""
+    """Configuration read tests"""
 
     @patch("cc_stats.version_checker.CONFIG_FILE")
     def test_auto_check_enabled_default(self, mock_file: MagicMock) -> None:
@@ -255,20 +255,20 @@ class TestConfig(unittest.TestCase):
     def test_check_interval_minimum(self, mock_file: MagicMock) -> None:
         mock_file.exists.return_value = True
         mock_file.read_text.return_value = json.dumps({"check_interval": 10})
-        # 最少 300 秒
+        # Minimum 300 seconds
         self.assertEqual(get_check_interval(), 300)
 
     @patch("cc_stats.version_checker.CONFIG_FILE")
     def test_config_corrupt_json(self, mock_file: MagicMock) -> None:
         mock_file.exists.return_value = True
         mock_file.read_text.return_value = "corrupt"
-        # fallback 到默认值
+        # fallback to default values
         self.assertTrue(is_auto_check_enabled())
         self.assertEqual(get_check_interval(), DEFAULT_CHECK_INTERVAL)
 
 
 class TestFetchLatestVersion(unittest.TestCase):
-    """PyPI 请求测试"""
+    """PyPI request tests"""
 
     @patch("cc_stats.version_checker.urllib.request.urlopen")
     def test_fetch_success(self, mock_urlopen: MagicMock) -> None:
@@ -311,7 +311,7 @@ class TestFetchLatestVersion(unittest.TestCase):
 
 
 class TestCheckForUpdate(unittest.TestCase):
-    """主逻辑测试"""
+    """Main logic tests"""
 
     @patch("cc_stats.version_checker._write_cache")
     @patch("cc_stats.version_checker.fetch_latest_version")
@@ -326,7 +326,7 @@ class TestCheckForUpdate(unittest.TestCase):
         mock_write: MagicMock,
     ) -> None:
         mock_enabled.return_value = True
-        mock_cache.return_value = None  # 无缓存
+        mock_cache.return_value = None  # no cache
         mock_fetch.return_value = "0.3.0"
 
         result = check_for_update()
@@ -392,7 +392,7 @@ class TestCheckForUpdate(unittest.TestCase):
     ) -> None:
         mock_enabled.return_value = True
         mock_interval.return_value = 14400
-        # 缓存 1 分钟前写入（未过期）
+        # Cache written 1 minute ago (not expired)
         mock_cache.return_value = VersionCache(
             latest_version="0.5.0",
             checked_at=time.time() - 60,
@@ -419,7 +419,7 @@ class TestCheckForUpdate(unittest.TestCase):
     ) -> None:
         mock_enabled.return_value = True
         mock_interval.return_value = 14400
-        # 缓存 5 小时前写入（已过期）
+        # Cache written 5 hours ago (expired)
         mock_cache.return_value = VersionCache(
             latest_version="0.3.0",
             checked_at=time.time() - 18000,
@@ -445,7 +445,7 @@ class TestCheckForUpdate(unittest.TestCase):
     ) -> None:
         mock_enabled.return_value = True
         mock_cache.return_value = None
-        mock_fetch.return_value = None  # 网络失败
+        mock_fetch.return_value = None  # network failure
 
         result = check_for_update()
         self.assertIsNone(result)
@@ -453,7 +453,7 @@ class TestCheckForUpdate(unittest.TestCase):
 
 
 class TestGetCachedUpdate(unittest.TestCase):
-    """缓存读取更新测试"""
+    """Cached update read tests"""
 
     @patch("cc_stats.version_checker._read_cache")
     @patch("cc_stats.version_checker.__version__", "0.2.0")
@@ -485,7 +485,7 @@ class TestGetCachedUpdate(unittest.TestCase):
 
 
 class TestFormatUpdateMessage(unittest.TestCase):
-    """消息格式化测试"""
+    """Message formatting tests"""
 
     def test_format_message(self) -> None:
         result = CheckResult(
@@ -496,7 +496,7 @@ class TestFormatUpdateMessage(unittest.TestCase):
         msg = format_update_message(result)
         self.assertIn("v0.5.0", msg)
         self.assertIn("pip install --upgrade cc-statistics", msg)
-        self.assertIn("已发布", msg)
+        self.assertIn("已发布", msg)  # formatter output string, not translated here
 
 
 if __name__ == "__main__":

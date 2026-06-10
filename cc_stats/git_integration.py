@@ -1,4 +1,4 @@
-"""Git 集成：将 Claude Code 会话按时间归属到 git commit，计算每 commit 的 AI 成本"""
+"""Git integration: attribute Claude Code sessions to git commits by time, compute AI cost per commit"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-# Claude 模型定价 (USD per 1M tokens) — 与 analyzer.py 保持一致
+# Claude model pricing (USD per 1M tokens) — kept in sync with analyzer.py
 _INPUT_PRICE = 3.0        # $3/1M input tokens (Sonnet baseline)
 _OUTPUT_PRICE = 15.0      # $15/1M output tokens
 _CACHE_READ_PRICE = 0.30  # $0.30/1M cache read tokens
@@ -16,18 +16,18 @@ _CACHE_READ_PRICE = 0.30  # $0.30/1M cache read tokens
 
 @dataclass(frozen=True)
 class CommitInfo:
-    """单个 git commit 的基本信息"""
+    """Basic info for a single git commit"""
     hash: str
     timestamp: datetime
     author: str
-    message: str          # 首行
+    message: str          # first line
     added: int = 0
     removed: int = 0
 
 
 @dataclass
 class CommitCost:
-    """单个 commit 归属的 AI 会话成本"""
+    """AI session cost attributed to a single commit"""
     commit: CommitInfo
     session_count: int = 0
     total_tokens: int = 0
@@ -39,7 +39,7 @@ class CommitCost:
 
 @dataclass
 class GitIntegrationResult:
-    """Git 集成分析的完整结果"""
+    """Complete result of Git integration analysis"""
     repo_path: str
     commit_costs: list[CommitCost] = field(default_factory=list)
     total_commits: int = 0
@@ -53,15 +53,15 @@ def parse_git_log(
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> list[CommitInfo]:
-    """通过 git log 解析 commit 列表（含 numstat）
+    """Parse commit list (with numstat) via git log
 
     Args:
-        repo_path: git 仓库路径
-        since: 起始时间（可选）
-        until: 截止时间（可选）
+        repo_path: path to the git repository
+        since: start time (optional)
+        until: end time (optional)
 
     Returns:
-        按时间升序排列的 CommitInfo 列表
+        List of CommitInfo sorted in ascending time order
     """
     repo = Path(repo_path)
     if not (repo / ".git").exists() and not (repo / ".git").is_file():
@@ -103,9 +103,9 @@ def parse_git_log(
         if not stripped:
             continue
 
-        # commit 头行：\x00HASH|ISO_DATE|AUTHOR|MESSAGE
+        # commit header line: \x00HASH|ISO_DATE|AUTHOR|MESSAGE
         if stripped.startswith("\x00"):
-            # 先保存上一个 commit
+            # Save the previous commit first
             if current_hash and current_ts:
                 commits.append(CommitInfo(
                     hash=current_hash,
@@ -115,7 +115,7 @@ def parse_git_log(
                     added=current_added,
                     removed=current_removed,
                 ))
-            # 解析新 commit
+            # Parse new commit
             parts = stripped[1:].split("|", 3)
             if len(parts) < 4:
                 current_hash = ""
@@ -132,19 +132,19 @@ def parse_git_log(
             current_removed = 0
             continue
 
-        # numstat 行：added\tremoved\tfile_path
+        # numstat line: added\tremoved\tfile_path
         tab_parts = stripped.split("\t")
         if len(tab_parts) == 3:
             a_str, r_str, _ = tab_parts
             if a_str == "-" or r_str == "-":
-                continue  # 二进制文件
+                continue  # binary file
             try:
                 current_added += int(a_str)
                 current_removed += int(r_str)
             except ValueError:
                 continue
 
-    # 保存最后一个 commit
+    # Save the last commit
     if current_hash and current_ts:
         commits.append(CommitInfo(
             hash=current_hash,
@@ -155,7 +155,7 @@ def parse_git_log(
             removed=current_removed,
         ))
 
-    # 按时间升序
+    # Sort by time ascending
     commits.sort(key=lambda c: c.timestamp)
     return commits
 
@@ -165,7 +165,7 @@ def _estimate_cost(
     output_tokens: int,
     cache_read_tokens: int,
 ) -> float:
-    """估算 token 费用（USD）"""
+    """Estimate token cost (USD)"""
     return (
         input_tokens * _INPUT_PRICE / 1_000_000
         + output_tokens * _OUTPUT_PRICE / 1_000_000
@@ -177,16 +177,17 @@ def attribute_sessions_to_commits(
     commits: list[CommitInfo],
     sessions: list[dict],
 ) -> list[CommitCost]:
-    """将 session 按时间归属到 commit，计算每 commit 的 token/cost
+    """Attribute sessions to commits by time and compute token/cost per commit
 
-    归属规则：
-    - commit 的时间窗口 = (上一个 commit 时间, 当前 commit 时间]
-    - 第一个 commit 的窗口 = (commit_time - 24h, commit_time]
-    - 如果 session 时间范围与窗口有交集，按交集占 session 总时长的比例分配 token
+    Attribution rules:
+    - Commit time window = (previous commit time, current commit time]
+    - First commit's window = (commit_time - 24h, commit_time]
+    - If a session's time range overlaps with the window, tokens are allocated
+      proportionally based on the overlap fraction of the session's total duration
 
     Args:
-        commits: 按时间升序的 CommitInfo 列表
-        sessions: session 信息列表，每个 dict 包含:
+        commits: List of CommitInfo in ascending time order
+        sessions: List of session info dicts, each containing:
             - start_time: datetime
             - end_time: datetime
             - input_tokens: int
@@ -194,7 +195,7 @@ def attribute_sessions_to_commits(
             - cache_read_tokens: int
 
     Returns:
-        CommitCost 列表（与 commits 顺序对应）
+        List of CommitCost (in the same order as commits)
     """
     if not commits:
         return []
@@ -202,7 +203,7 @@ def attribute_sessions_to_commits(
     results: list[CommitCost] = []
 
     for i, commit in enumerate(commits):
-        # 确定 commit 窗口
+        # Determine the commit window
         if i == 0:
             window_start = commit.timestamp - timedelta(hours=24)
         else:
@@ -216,11 +217,11 @@ def attribute_sessions_to_commits(
             s_start = sess["start_time"]
             s_end = sess["end_time"]
 
-            # 跳过无效 session
+            # Skip invalid sessions
             if s_start is None or s_end is None:
                 continue
 
-            # 确保 timezone-aware 比较
+            # Ensure timezone-aware comparison
             if s_start.tzinfo is None:
                 s_start = s_start.replace(tzinfo=timezone.utc)
             if s_end.tzinfo is None:
@@ -233,8 +234,8 @@ def attribute_sessions_to_commits(
             if w_end.tzinfo is None:
                 w_end = w_end.replace(tzinfo=timezone.utc)
 
-            # 计算交集
-            # 零时长 session：只检查点是否在窗口内
+            # Compute overlap
+            # Zero-duration session: only check if the point is within the window
             session_duration = (s_end - s_start).total_seconds()
             if session_duration <= 0:
                 if w_start <= s_start <= w_end:
@@ -274,25 +275,25 @@ def analyze_git_integration(
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> GitIntegrationResult:
-    """执行完整的 Git 集成分析
+    """Run a complete Git integration analysis
 
     Args:
-        repo_path: git 仓库路径
-        all_stats: SessionStats 列表（来自 analyzer.analyze_session）
-        since: 起始时间过滤
-        until: 截止时间过滤
+        repo_path: path to the git repository
+        all_stats: list of SessionStats (from analyzer.analyze_session)
+        since: start time filter
+        until: end time filter
 
     Returns:
-        GitIntegrationResult 完整结果
+        Complete GitIntegrationResult
     """
     repo_path = str(repo_path)
 
-    # 1. 解析 git log
+    # 1. Parse git log
     commits = parse_git_log(repo_path, since=since, until=until)
     if not commits:
         return GitIntegrationResult(repo_path=repo_path)
 
-    # 2. 从 SessionStats 提取 session 摘要
+    # 2. Extract session summaries from SessionStats
     sessions: list[dict] = []
     for s in all_stats:
         tu = s.token_usage
@@ -304,19 +305,19 @@ def analyze_git_integration(
             "cache_read_tokens": tu.cache_read_input_tokens,
         })
 
-    # 3. 归属 session 到 commit
+    # 3. Attribute sessions to commits
     commit_costs = attribute_sessions_to_commits(commits, sessions)
 
-    # 4. 汇总
+    # 4. Aggregate
     total_tokens = sum(c.total_tokens for c in commit_costs)
     total_cost = sum(c.estimated_cost_usd for c in commit_costs)
     matched = len({j for c in commit_costs for j in range(len(sessions))
                     if c.session_count > 0})
-    # 更精确：统计被匹配的唯一 session 数
+    # More precise: count unique matched sessions
     matched_set: set[int] = set()
     for i, cc in enumerate(commit_costs):
         if cc.session_count > 0:
-            # 回溯查看哪些 session 匹配了此 commit
+            # Look back to see which sessions matched this commit
             for j, sess in enumerate(sessions):
                 s_start = sess["start_time"]
                 s_end = sess["end_time"]

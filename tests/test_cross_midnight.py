@@ -1,4 +1,4 @@
-"""跨日 session 按消息时间戳归日的单元测试 (Issue #15)"""
+"""Unit tests for cross-day session date attribution by message timestamp (Issue #15)"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _make_session(messages: list[Message]) -> Session:
 
 
 def _ts(year: int, month: int, day: int, hour: int, minute: int = 0) -> str:
-    """生成 UTC ISO 格式时间戳"""
+    """Generate a UTC ISO-format timestamp"""
     return f"{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00+00:00"
 
 
@@ -37,7 +37,7 @@ def _assistant_msg_with_usage(
     output_tokens: int = 50,
     model: str = "claude-sonnet-4-20250514",
 ) -> Message:
-    """创建带 token usage 的 assistant 消息"""
+    """Create an assistant message with token usage"""
     return Message(
         role="assistant",
         timestamp=ts,
@@ -53,10 +53,10 @@ def _assistant_msg_with_usage(
 
 
 class TestTokenByDate:
-    """测试 token_by_date 按消息时间戳归日"""
+    """Tests for token_by_date attribution by message timestamp"""
 
     def test_single_day_session(self):
-        """单日 session，所有 token 归到同一天"""
+        """Single-day session: all tokens attributed to the same date"""
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 10), content="hello"),
             _assistant_msg_with_usage(_ts(2026, 3, 15, 10, 1), input_tokens=200, output_tokens=100),
@@ -65,22 +65,23 @@ class TestTokenByDate:
         ])
         stats = analyze_session(session)
 
-        # token_usage 总量不变（向后兼容）
+        # token_usage total is unchanged (backward-compatible)
         assert stats.token_usage.input_tokens == 500
         assert stats.token_usage.output_tokens == 250
 
-        # token_by_date 只有一个日期
+        # token_by_date has only one date
         assert len(stats.token_by_date) == 1
-        # 注意：key 是本地日期，取决于时区。UTC 10:00 在 UTC+8 是 18:00 同一天
-        # 所以我们只验证总量
+        # Note: key is the local date, which depends on timezone. UTC 10:00 is 18:00 same day in UTC+8
+        # So we only verify the total
         total_by_date = sum(tu.input_tokens for tu in stats.token_by_date.values())
         assert total_by_date == 500
 
     def test_cross_midnight_session(self):
-        """跨午夜 session，token 分配到两个不同日期
+        """Cross-midnight session: tokens distributed across two different dates
 
-        使用间隔足够大的 UTC 时间（跨越 24h），确保无论本地时区
-        是什么，两条 assistant 消息都落在不同的本地自然日。
+        Uses UTC times with a gap large enough (> 24h) to ensure that,
+        regardless of local timezone, the two assistant messages fall on
+        different local calendar days.
         """
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 3), content="start"),
@@ -90,26 +91,26 @@ class TestTokenByDate:
         ])
         stats = analyze_session(session)
 
-        # token_usage 总量保持不变（向后兼容）
+        # token_usage total stays unchanged (backward-compatible)
         assert stats.token_usage.input_tokens == 500
         assert stats.token_usage.output_tokens == 250
 
-        # token_by_date 应该有两个日期
+        # token_by_date should have two dates
         assert len(stats.token_by_date) == 2
 
-        # 两个日期的 token 总和等于 token_usage
+        # The sum of tokens across both dates equals token_usage
         total_input = sum(tu.input_tokens for tu in stats.token_by_date.values())
         total_output = sum(tu.output_tokens for tu in stats.token_by_date.values())
         assert total_input == 500
         assert total_output == 250
 
     def test_cross_midnight_correct_date_assignment(self):
-        """验证 token 归属到正确的本地日期
+        """Verify tokens are attributed to the correct local dates
 
-        使用 UTC 时间构造跨日场景，验证 token_by_date 的 key
-        包含正确的两个日期。
+        Uses UTC times to construct a cross-day scenario and verifies that
+        token_by_date keys contain the correct two dates.
         """
-        # 使用差距足够大的时间确保无论什么时区都跨日
+        # Use a gap large enough to guarantee a cross-day boundary in any timezone
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 2), content="early morning"),
             _assistant_msg_with_usage(_ts(2026, 3, 15, 3), input_tokens=100, output_tokens=50),
@@ -118,10 +119,10 @@ class TestTokenByDate:
         ])
         stats = analyze_session(session)
 
-        # 无论本地时区如何，两条 assistant 消息的本地日期应该不同
+        # Regardless of local timezone, the two assistant messages should fall on different local dates
         assert len(stats.token_by_date) == 2
 
-        # 获取两个日期的 token
+        # Get tokens for each date
         dates = sorted(stats.token_by_date.keys())
         day1_tokens = stats.token_by_date[dates[0]]
         day2_tokens = stats.token_by_date[dates[1]]
@@ -132,7 +133,7 @@ class TestTokenByDate:
         assert day2_tokens.output_tokens == 80
 
     def test_three_day_session(self):
-        """跨三天的 session"""
+        """Session spanning three days"""
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 14, 3), content="day 1"),
             _assistant_msg_with_usage(_ts(2026, 3, 14, 4), input_tokens=100, output_tokens=50),
@@ -146,10 +147,10 @@ class TestTokenByDate:
         assert len(stats.token_by_date) == 3
         total_input = sum(tu.input_tokens for tu in stats.token_by_date.values())
         assert total_input == 600
-        assert stats.token_usage.input_tokens == 600  # 向后兼容
+        assert stats.token_usage.input_tokens == 600  # backward-compatible
 
     def test_no_usage_messages(self):
-        """无 usage 的消息不影响 token_by_date"""
+        """Messages without usage do not affect token_by_date"""
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 10), content="hello"),
             Message(role="assistant", timestamp=_ts(2026, 3, 15, 10, 1), content="hi"),
@@ -159,7 +160,7 @@ class TestTokenByDate:
         assert stats.token_usage.total == 0
 
     def test_cache_tokens_in_token_by_date(self):
-        """cache tokens 也正确归日"""
+        """Cache tokens are also correctly attributed by date"""
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 3), content="q1"),
             Message(
@@ -184,10 +185,10 @@ class TestTokenByDate:
 
 
 class TestTokenByDateMerge:
-    """测试 merge_stats 对 token_by_date 的合并"""
+    """Tests for merge_stats merging of token_by_date"""
 
     def test_merge_token_by_date(self):
-        """合并两个会话的 token_by_date"""
+        """Merge token_by_date from two sessions"""
         s1 = SessionStats(session_id="s1", project_path="/tmp")
         s1.token_by_date["2026-03-15"] = TokenUsage(
             input_tokens=100, output_tokens=50,
@@ -211,7 +212,7 @@ class TestTokenByDateMerge:
         assert merged.token_by_date["2026-03-16"].output_tokens == 120
 
     def test_merge_empty_token_by_date(self):
-        """合并时空 token_by_date 不影响结果"""
+        """Empty token_by_date during merge does not affect result"""
         s1 = SessionStats(session_id="s1", project_path="/tmp")
         s2 = SessionStats(session_id="s2", project_path="/tmp")
         s2.token_by_date["2026-03-15"] = TokenUsage(input_tokens=100)
@@ -221,10 +222,10 @@ class TestTokenByDateMerge:
 
 
 class TestBackwardCompatibility:
-    """确保 token_usage 向后兼容"""
+    """Ensure token_usage backward compatibility"""
 
     def test_token_usage_unchanged(self):
-        """token_usage 不受 token_by_date 影响，保持完整总量"""
+        """token_usage is unaffected by token_by_date and retains the full total"""
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 23), content="start"),
             _assistant_msg_with_usage(_ts(2026, 3, 15, 23, 30), input_tokens=100, output_tokens=50),
@@ -233,17 +234,17 @@ class TestBackwardCompatibility:
         ])
         stats = analyze_session(session)
 
-        # token_usage 是全量总和，与以前行为一致
+        # token_usage is the full sum, consistent with previous behavior
         assert stats.token_usage.input_tokens == 300
         assert stats.token_usage.output_tokens == 130
         assert stats.token_usage.total == 430
 
-        # token_by_date 各日之和也等于总量
+        # The sum of token_by_date across all dates also equals the total
         by_date_total = sum(tu.total for tu in stats.token_by_date.values())
         assert by_date_total == 430
 
     def test_token_by_model_unchanged(self):
-        """token_by_model 不受影响"""
+        """token_by_model is unaffected"""
         session = _make_session([
             Message(role="user", timestamp=_ts(2026, 3, 15, 10), content="q"),
             _assistant_msg_with_usage(

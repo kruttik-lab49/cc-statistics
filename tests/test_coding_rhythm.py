@@ -1,4 +1,4 @@
-"""编码节奏分析与工作模式分类的单元测试"""
+"""Unit tests for coding rhythm analysis and work mode classification"""
 
 from __future__ import annotations
 
@@ -93,11 +93,11 @@ class TestClassifyWorkMode:
 
 
 def _local_tz() -> timezone:
-    """获取本地时区偏移"""
+    """Get the local timezone offset"""
     now = datetime.now()
     utc_now = datetime.now(timezone.utc)
     offset = now.replace(tzinfo=None) - utc_now.replace(tzinfo=None)
-    # 四舍五入到最近的分钟
+    # Round to the nearest minute
     total_secs = int(offset.total_seconds() / 60) * 60
     return timezone(timedelta(seconds=total_secs))
 
@@ -107,7 +107,7 @@ def _make_session(
     user_msgs: int = 5,
     write_lines: int = 0,
 ) -> Session:
-    """创建一个简单的测试 Session，start_hour 为本地时间"""
+    """Create a simple test Session; start_hour is in local time"""
     local_tz = _local_tz()
     base_ts = datetime(2026, 4, 12, start_hour, 0, 0, tzinfo=local_tz)
     messages: list[Message] = []
@@ -337,7 +337,7 @@ class TestFormatCodingRhythm:
         assert "★" in output
 
     def test_all_periods_shown(self):
-        """即使没有数据的时段也应该显示（灰色）"""
+        """All time periods should be shown even when they have no data (greyed out)"""
         stats = SessionStats(
             session_id="t",
             project_path="/tmp",

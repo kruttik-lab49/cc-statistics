@@ -1,4 +1,4 @@
-"""导出会话为 Markdown 格式，方便分享"""
+"""Export sessions to Markdown format for easy sharing"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .parser import (
 
 
 def _extract_text(content) -> str:
-    """从 content 中提取纯文本"""
+    """Extract plain text from content"""
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -29,7 +29,7 @@ def _extract_text(content) -> str:
                     name = block.get("name", "")
                     parts.append(f"[Tool: {name}]")
                 elif block.get("type") == "tool_result":
-                    # 跳过工具返回
+                    # Skip tool results
                     continue
             elif isinstance(block, str):
                 parts.append(block)
@@ -38,7 +38,7 @@ def _extract_text(content) -> str:
 
 
 def _fmt_ts(ts_str: str) -> str:
-    """格式化时间戳"""
+    """Format timestamp"""
     if not ts_str:
         return ""
     try:
@@ -49,10 +49,10 @@ def _fmt_ts(ts_str: str) -> str:
 
 
 def export_session(session: Session, include_tools: bool = False) -> str:
-    """将会话导出为 Markdown"""
+    """Export session to Markdown"""
     lines: list[str] = []
 
-    # 标题
+    # Title
     start_ts = ""
     for msg in session.messages:
         if msg.timestamp:
@@ -63,20 +63,20 @@ def export_session(session: Session, include_tools: bool = False) -> str:
                 pass
             break
 
-    lines.append(f"# Claude Code 对话记录")
+    lines.append(f"# Claude Code Conversation")
     lines.append(f"")
     if start_ts:
-        lines.append(f"**时间:** {start_ts}")
+        lines.append(f"**Time:** {start_ts}")
     if session.project_path:
         project_name = Path(session.project_path).name
-        lines.append(f"**项目:** {project_name}")
-    lines.append(f"**会话 ID:** `{session.session_id[:12]}...`")
+        lines.append(f"**Project:** {project_name}")
+    lines.append(f"**Session ID:** `{session.session_id[:12]}...`")
     lines.append(f"")
     lines.append(f"---")
     lines.append(f"")
 
     for msg in session.messages:
-        # 跳过工具返回和 meta 消息
+        # Skip tool results and meta messages
         if msg.is_tool_result or msg.is_meta:
             continue
 
@@ -84,7 +84,7 @@ def export_session(session: Session, include_tools: bool = False) -> str:
         if not text:
             continue
 
-        # 跳过纯工具调用（没有文本输出的 assistant 消息）
+        # Skip pure tool calls (assistant messages with no text output)
         if msg.role == "assistant" and text.startswith("[Tool:") and "\n" not in text:
             if not include_tools:
                 continue
@@ -113,26 +113,26 @@ def export_session(session: Session, include_tools: bool = False) -> str:
 
 def find_and_export(keyword: str, output: str | None = None,
                     include_tools: bool = False) -> str | None:
-    """查找会话并导出
+    """Find a session and export it
 
     Args:
-        keyword: 会话 ID 前缀 或 搜索关键词
-        output: 输出文件路径（None 则输出到 stdout）
-        include_tools: 是否包含工具调用
+        keyword: Session ID prefix or search keyword
+        output: Output file path (None to output to stdout)
+        include_tools: Whether to include tool calls
     """
-    # 搜索所有会话（Claude + Codex + Gemini）
+    # Search all sessions (Claude + Codex + Gemini)
     all_files: list[Path] = list(find_sessions())
     all_files.extend(find_codex_sessions())
     all_files.extend(find_gemini_sessions())
 
-    # 先按 session ID 前缀匹配
+    # First match by session ID prefix
     matched = None
     for f in all_files:
         if f.stem.startswith(keyword):
             matched = f
             break
 
-    # 再按内容搜索
+    # Then search by content
     if not matched:
         for f in sorted(all_files, key=lambda p: p.stat().st_mtime, reverse=True):
             try:

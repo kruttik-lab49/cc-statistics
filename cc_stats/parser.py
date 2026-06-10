@@ -1,4 +1,4 @@
-"""解析 Claude Code / Codex / Gemini 会话文件"""
+"""Parse Claude Code / Codex / Gemini session files"""
 
 from __future__ import annotations
 
@@ -27,9 +27,9 @@ class Message:
     is_tool_result: bool = False
     is_meta: bool = False
     session_id: str = ""
-    message_id: str = ""  # API message ID，用于流式去重
+    message_id: str = ""  # API message ID, used for stream dedup
     tool_results: dict[str, bool] = field(default_factory=dict)
-    # tool_use_id -> is_error, 从 tool_result 块中提取
+    # tool_use_id -> is_error, extracted from tool_result blocks
 
 
 @dataclass
@@ -42,7 +42,7 @@ class Session:
 
 
 def parse_jsonl(path: Path) -> Session:
-    """解析单个 JSONL 文件为 Session 对象"""
+    """Parse a single JSONL file into a Session object"""
     messages: list[Message] = []
     session_id = path.stem
     project_path = ""
@@ -75,7 +75,7 @@ def parse_jsonl(path: Path) -> Session:
                 if not isinstance(usage, dict):
                     usage = {}
 
-                # 判断是否为 tool_result（工具返回）
+                # Check if this is a tool_result (tool response)
                 is_tool_result = False
                 if isinstance(content, list):
                     for block in content:
@@ -83,7 +83,7 @@ def parse_jsonl(path: Path) -> Session:
                             is_tool_result = True
                             break
 
-                # 提取 tool_use 调用
+                # Extract tool_use calls
                 tool_calls: list[ToolCall] = []
                 if msg_type == "assistant" and isinstance(content, list):
                     for block in content:
@@ -95,7 +95,7 @@ def parse_jsonl(path: Path) -> Session:
                                 tool_use_id=block.get("id", ""),
                             ))
 
-                # 提取 tool_result 的 is_error 信息
+                # Extract is_error info from tool_result
                 tool_results: dict[str, bool] = {}
                 if is_tool_result and isinstance(content, list):
                     for block in content:
@@ -122,9 +122,9 @@ def parse_jsonl(path: Path) -> Session:
     for subagent_file in _subagent_files_for_parent(path):
         read_messages(subagent_file)
 
-    # 流式去重：Claude Code 对同一条 API 消息会写多条 JSONL 记录
-    # （prefill 记录 output_tokens=1 + 最终记录 output_tokens=实际值）
-    # 按 message_id 去重，保留 output_tokens 最大的记录
+    # Stream dedup: Claude Code writes multiple JSONL records for the same API message
+    # (prefill record output_tokens=1 + final record output_tokens=actual value)
+    # Deduplicate by message_id, keeping the record with the highest output_tokens
     messages = _deduplicate_messages(messages)
 
     return Session(
@@ -136,7 +136,7 @@ def parse_jsonl(path: Path) -> Session:
 
 
 def _deduplicate_messages(messages: list[Message]) -> list[Message]:
-    """按 message_id 去重 assistant 消息，保留 output_tokens 最大的记录"""
+    """Deduplicate assistant messages by message_id, keeping the record with the highest output_tokens"""
     best: dict[str, tuple[int, int]] = {}  # message_id -> (index, output_tokens)
     to_remove: set[int] = set()
 
@@ -160,9 +160,9 @@ def _deduplicate_messages(messages: list[Message]) -> list[Message]:
 
 
 def _path_to_dirname(path: Path) -> str:
-    """将绝对路径转为 Claude Code 的项目目录名格式
+    """Convert an absolute path to Claude Code's project directory name format
 
-    例如 /Users/foo/bar → -Users-foo-bar
+    e.g. /Users/foo/bar → -Users-foo-bar
     """
     return str(path.resolve()).replace("/", "-")
 
@@ -204,9 +204,9 @@ def _claude_session_entry_files(project_path: Path) -> list[Path]:
 
 
 def find_sessions(project_dir: Path | None = None) -> list[Path]:
-    """查找 ~/.claude/projects/ 下所有 JSONL 会话文件
+    """Find all JSONL session files under ~/.claude/projects/
 
-    如果指定 project_dir，只返回匹配的项目。
+    If project_dir is specified, only return files for the matching project.
     """
     claude_projects = Path.home() / ".claude" / "projects"
     if not claude_projects.exists():
@@ -227,7 +227,7 @@ def find_sessions(project_dir: Path | None = None) -> list[Path]:
 
 
 def find_sessions_by_keyword(keyword: str) -> list[Path]:
-    """按关键词模糊匹配项目，在目录名和 JSONL 中的 cwd 中搜索"""
+    """Fuzzy-match projects by keyword, searching in directory names and cwd fields in JSONL files"""
     import json
 
     claude_projects = Path.home() / ".claude" / "projects"
@@ -244,12 +244,12 @@ def find_sessions_by_keyword(keyword: str) -> list[Path]:
         if not jsonl_files:
             continue
 
-        # 先在目录名中搜索
+        # Search in directory name first
         if keyword_lower in proj.name.lower():
             results.extend(jsonl_files)
             continue
 
-        # 再在 JSONL 的 cwd 中搜索
+        # Then search in the cwd field in JSONL files
         for jf in jsonl_files:
             try:
                 with open(jf, encoding="utf-8") as fh:
@@ -271,7 +271,7 @@ def find_sessions_by_keyword(keyword: str) -> list[Path]:
     return results
 
 
-# ── Codex 解析 ───────────────────────────────────────────────
+# ── Codex parsing ────────────────────────────────────────────
 
 _CODEX_TOOL_MAP: dict[str, str] = {
     "exec_command": "Bash",
@@ -402,7 +402,7 @@ def _extract_codex_token_usage(payload: dict[str, Any]) -> dict[str, Any]:
     if raw_input <= 0 and cached <= 0 and output <= 0:
         return {}
 
-    # Codex 的 input_tokens 包含 cached_input_tokens，转换为 cc-stats 统一口径：
+    # Codex's input_tokens includes cached_input_tokens; convert to cc-stats unified format:
     # total = input + output + cache_read + cache_creation
     input_tokens = max(raw_input - cached, 0)
     return {
@@ -430,7 +430,7 @@ def _extract_codex_model(payload: dict[str, Any]) -> str:
 
 
 def parse_codex_jsonl(path: Path) -> Session:
-    """解析 Codex rollout JSONL 会话文件"""
+    """Parse a Codex rollout JSONL session file"""
     session_id = path.stem
     project_path = ""
     messages: list[Message] = []
@@ -684,7 +684,7 @@ def _read_codex_session_meta(path: Path) -> dict[str, Any]:
 
 
 def find_codex_sessions(project_dir: Path | None = None) -> list[Path]:
-    """查找 ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl 会话文件"""
+    """Find ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl session files"""
     base = Path.home() / ".codex" / "sessions"
     if not base.exists():
         return []
@@ -714,7 +714,7 @@ def find_codex_sessions(project_dir: Path | None = None) -> list[Path]:
 
 
 def find_codex_sessions_by_keyword(keyword: str) -> list[Path]:
-    """按关键词搜索 Codex 会话（路径/cwd/用户消息内容）"""
+    """Search Codex sessions by keyword (path / cwd / user message content)"""
     keyword_lower = keyword.lower()
     results: list[Path] = []
 
@@ -752,9 +752,9 @@ def find_codex_sessions_by_keyword(keyword: str) -> list[Path]:
     return results
 
 
-# ── Gemini CLI 解析 ──────────────────────────────────────────
+# ── Gemini CLI parsing ───────────────────────────────────────
 
-# Gemini 工具名映射为 cc-stats 内部统一名称
+# Gemini tool name mapping to cc-stats internal names
 _GEMINI_TOOL_MAP: dict[str, str] = {
     "read_file": "Read",
     "read_many_files": "Read",
@@ -770,16 +770,16 @@ _GEMINI_TOOL_MAP: dict[str, str] = {
 
 
 def parse_gemini_json(path: Path) -> Session:
-    """解析 Gemini CLI 的 JSON 会话文件为 Session 对象
+    """Parse a Gemini CLI JSON session file into a Session object
 
-    Gemini 会话格式：单个 JSON 文件，包含 sessionId、messages[] 等字段。
-    消息类型：user / gemini / info / error / warning
+    Gemini session format: a single JSON file containing sessionId, messages[], etc.
+    Message types: user / gemini / info / error / warning
     """
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
     session_id = data.get("sessionId", path.stem)
-    # 尝试从 directories 字段获取项目路径
+    # Try to get the project path from the directories field
     dirs = data.get("directories", [])
     project_path = dirs[0] if dirs else ""
 
@@ -802,7 +802,7 @@ def parse_gemini_json(path: Path) -> Session:
             content = _extract_gemini_content(msg_record.get("content"))
             model = msg_record.get("model", "")
 
-            # 提取工具调用
+            # Extract tool calls
             tool_calls: list[ToolCall] = []
             for tc in msg_record.get("toolCalls", []):
                 raw_name = tc.get("name", "")
@@ -813,7 +813,7 @@ def parse_gemini_json(path: Path) -> Session:
                     timestamp=tc.get("timestamp", timestamp),
                 ))
 
-            # 转换 token 用量为 cc-stats 统一格式
+            # Convert token usage to the cc-stats unified format
             usage: dict[str, Any] = {}
             tokens = msg_record.get("tokens")
             if tokens and isinstance(tokens, dict):
@@ -834,7 +834,7 @@ def parse_gemini_json(path: Path) -> Session:
                 session_id=session_id,
             ))
 
-        # info / error / warning 类型跳过（非对话消息）
+        # info / error / warning types are skipped (non-conversation messages)
 
     return Session(
         session_id=session_id,
@@ -846,7 +846,7 @@ def parse_gemini_json(path: Path) -> Session:
 
 
 def _extract_gemini_content(raw: Any) -> Any:
-    """提取 Gemini 消息内容（可能是字符串或 Part 列表）"""
+    """Extract Gemini message content (may be a string or a list of Parts)"""
     if isinstance(raw, str):
         return raw
     if isinstance(raw, list):
@@ -859,7 +859,7 @@ def _extract_gemini_content(raw: Any) -> Any:
 
 
 def find_gemini_sessions() -> list[Path]:
-    """查找 ~/.gemini/tmp/*/chats/*.json 会话文件"""
+    """Find ~/.gemini/tmp/*/chats/*.json session files"""
     gemini_dir = Path.home() / ".gemini" / "tmp"
     if not gemini_dir.exists():
         return []
@@ -875,7 +875,7 @@ def find_gemini_sessions() -> list[Path]:
 
 
 def find_gemini_sessions_by_keyword(keyword: str) -> list[Path]:
-    """按关键词搜索 Gemini 会话（在 directories 和内容中搜索）"""
+    """Search Gemini sessions by keyword (searches in directories and content)"""
     all_sessions = find_gemini_sessions()
     if not all_sessions:
         return []
@@ -901,7 +901,7 @@ def find_gemini_sessions_by_keyword(keyword: str) -> list[Path]:
 
 
 def parse_session_file(path: Path) -> Session:
-    """自动识别并解析会话文件（Claude / Codex / Gemini）"""
+    """Auto-detect and parse a session file (Claude / Codex / Gemini)"""
     if path.suffix == ".json":
         return parse_gemini_json(path)
     if _looks_like_codex_jsonl(path):

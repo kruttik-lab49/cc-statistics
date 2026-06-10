@@ -316,7 +316,7 @@ async function checkVersion(){
   try{
     const r=await api('/api/version_check');
     if(r.has_update){
-      document.getElementById('update-msg').innerHTML='cc-statistics v'+r.latest_version+' 已发布，运行 <code>'+r.upgrade_command+'</code> 更新';
+      document.getElementById('update-msg').innerHTML='cc-statistics v'+r.latest_version+' is available — run <code>'+r.upgrade_command+'</code> to upgrade';
       document.getElementById('update-banner').classList.add('show');
     }
   }catch(e){}

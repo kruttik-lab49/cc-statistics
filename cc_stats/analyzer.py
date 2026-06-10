@@ -1,4 +1,4 @@
-"""分析会话数据，计算各项工程指标"""
+"""Analyze session data and compute engineering metrics"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from .parser import Message, Session, ToolCall
 from .pricing import is_claude_model, match_model_pricing
 
-# 文件扩展名 → 语言映射
+# File extension → language mapping
 EXT_TO_LANG: dict[str, str] = {
     ".py": "Python",
     ".js": "JavaScript",
@@ -56,38 +56,38 @@ EXT_TO_LANG: dict[str, str] = {
     ".gradle": "Gradle",
 }
 
-# 工具说明
+# Tool descriptions
 TOOL_DESCRIPTIONS: dict[str, str] = {
-    "Bash": "执行 Shell 命令",
-    "Read": "读取文件内容",
-    "Write": "创建/覆写文件",
-    "Edit": "编辑文件（精确替换）",
-    "Glob": "按模式搜索文件",
-    "Grep": "按内容搜索文件",
-    "Agent": "启动子代理执行子任务",
-    "Skill": "调用技能/Slash命令",
-    "WebFetch": "抓取网页内容",
-    "WebSearch": "搜索互联网",
-    "NotebookEdit": "编辑 Jupyter Notebook",
-    "LSP": "调用语言服务器",
-    "TodoWrite": "写入待办事项",
-    "AskUserQuestion": "向用户提问",
-    "TaskCreate": "创建任务",
-    "TaskUpdate": "更新任务状态",
-    "TaskGet": "获取任务信息",
-    "TaskList": "列出任务",
-    "TaskOutput": "获取任务输出",
-    "TaskStop": "停止任务",
-    "ToolSearch": "搜索可用工具",
-    "SendMessage": "向子代理发送消息",
+    "Bash": "Execute shell command",
+    "Read": "Read file contents",
+    "Write": "Create/overwrite file",
+    "Edit": "Edit file (precise replacement)",
+    "Glob": "Search files by pattern",
+    "Grep": "Search files by content",
+    "Agent": "Launch subagent for subtask",
+    "Skill": "Invoke skill/slash command",
+    "WebFetch": "Fetch web page content",
+    "WebSearch": "Search the internet",
+    "NotebookEdit": "Edit Jupyter notebook",
+    "LSP": "Call language server",
+    "TodoWrite": "Write todo items",
+    "AskUserQuestion": "Ask user a question",
+    "TaskCreate": "Create task",
+    "TaskUpdate": "Update task status",
+    "TaskGet": "Get task info",
+    "TaskList": "List tasks",
+    "TaskOutput": "Get task output",
+    "TaskStop": "Stop task",
+    "ToolSearch": "Search available tools",
+    "SendMessage": "Send message to subagent",
 }
 
-# 活跃时间判定：两条消息间隔超过此值视为"不活跃"
+# Active time threshold: gaps larger than this between messages are considered "idle"
 IDLE_THRESHOLD = timedelta(minutes=5)
 
 
 def _parse_ts(ts: str) -> datetime | None:
-    """解析 ISO 格式或毫秒时间戳"""
+    """Parse ISO format or millisecond timestamp"""
     if not ts:
         return None
     try:
@@ -101,7 +101,7 @@ def _parse_ts(ts: str) -> datetime | None:
 
 
 def _get_local_date(ts: str) -> str | None:
-    """从消息时间戳提取本地日期字符串 (YYYY-MM-DD)"""
+    """Extract local date string (YYYY-MM-DD) from message timestamp"""
     dt = _parse_ts(ts)
     if dt is None:
         return None
@@ -109,7 +109,7 @@ def _get_local_date(ts: str) -> str | None:
 
 
 def _get_local_minute(ts: str) -> str | None:
-    """从消息时间戳提取本地分钟字符串 (YYYY-MM-DD HH:MM)"""
+    """Extract local minute string (YYYY-MM-DD HH:MM) from message timestamp"""
     dt = _parse_ts(ts)
     if dt is None:
         return None
@@ -117,13 +117,13 @@ def _get_local_minute(ts: str) -> str | None:
 
 
 def _detect_lang(file_path: str) -> str:
-    """根据文件扩展名检测编程语言"""
+    """Detect programming language from file extension"""
     _, ext = os.path.splitext(file_path)
     return EXT_TO_LANG.get(ext.lower(), f"Other ({ext})" if ext else "Unknown")
 
 
 def _count_lines(text: str) -> int:
-    """统计文本行数（不含末尾空行）"""
+    """Count lines in text (excluding trailing blank lines)"""
     if not text:
         return 0
     return len(text.rstrip("\n").split("\n"))
@@ -170,98 +170,98 @@ class TokenUsage:
 
 @dataclass
 class SkillUsage:
-    """单个 Skill 的使用统计"""
+    """Usage statistics for a single Skill"""
     name: str
     call_count: int = 0
     success_count: int = 0
     error_count: int = 0
-    unknown_count: int = 0  # 无法确定结果的调用
+    unknown_count: int = 0  # calls whose outcome could not be determined
     hourly_dist: dict[int, int] = field(default_factory=dict)  # hour(0-23) -> count
     daily_dist: dict[str, int] = field(default_factory=dict)   # "YYYY-MM-DD" -> count
 
 
 @dataclass
 class SessionStats:
-    """单个会话的统计结果"""
+    """Statistics results for a single session"""
     session_id: str
     project_path: str
 
-    # 1. 用户指令数
+    # 1. User instruction count
     user_message_count: int = 0
 
-    # 2. 工具调用
+    # 2. Tool calls
     tool_call_total: int = 0
     tool_call_counts: dict[str, int] = field(default_factory=dict)
 
-    # 3. 开发时长
+    # 3. Development duration
     start_time: datetime | None = None
     end_time: datetime | None = None
     total_duration: timedelta = field(default_factory=timedelta)
-    ai_duration: timedelta = field(default_factory=timedelta)       # AI 处理时长
-    user_duration: timedelta = field(default_factory=timedelta)     # 用户活跃时长（审查/编码）
+    ai_duration: timedelta = field(default_factory=timedelta)       # AI processing time
+    user_duration: timedelta = field(default_factory=timedelta)     # user active time (review/coding)
     active_duration: timedelta = field(default_factory=timedelta)   # ai + user
-    turn_count: int = 0                                             # 对话轮次数
+    turn_count: int = 0                                             # number of conversation turns
 
-    # 4. 代码行数 (AI — 来自 Edit/Write 工具调用)
+    # 4. Lines of code (AI — from Edit/Write tool calls)
     code_changes: list[CodeChange] = field(default_factory=list)
     lines_by_lang: dict[str, dict[str, int]] = field(default_factory=dict)
     total_added: int = 0
     total_removed: int = 0
 
-    # 4b. 代码行数 (Git — 会话期间的所有 commit)
+    # 4b. Lines of code (Git — all commits during the session)
     git_total_added: int = 0
     git_total_removed: int = 0
     git_lines_by_lang: dict[str, dict[str, int]] = field(default_factory=dict)
     git_commit_count: int = 0
-    git_ai_commit_count: int = 0       # Co-Authored-By: Claude 的 commit 数
-    git_ai_added: int = 0              # AI commit 的新增行数
-    git_ai_removed: int = 0            # AI commit 的删除行数
+    git_ai_commit_count: int = 0       # number of commits with Co-Authored-By: Claude
+    git_ai_added: int = 0              # lines added in AI commits
+    git_ai_removed: int = 0            # lines removed in AI commits
     git_available: bool = False
 
-    # 5. Token 消耗
+    # 5. Token usage
     token_usage: TokenUsage = field(default_factory=TokenUsage)
     token_by_model: dict[str, TokenUsage] = field(default_factory=dict)
 
-    # 6. Skill 使用统计
+    # 6. Skill usage statistics
     skill_stats: dict[str, SkillUsage] = field(default_factory=dict)
 
-    # 7. 按日期分配的 Token（跨日 session 按消息时间戳归日）
-    # key: "YYYY-MM-DD" 本地日期, value: 该日的 TokenUsage
+    # 7. Tokens allocated by date (cross-day sessions bucketed by message timestamp)
+    # key: "YYYY-MM-DD" local date, value: TokenUsage for that day
     token_by_date: dict[str, TokenUsage] = field(default_factory=dict)
 
-    # 7b. 按日期 + 模型分配的 Token，用于日期过滤后的模型拆分和费用估算
+    # 7b. Tokens allocated by date + model, used for model breakdown and cost estimation after date filtering
     # key: "YYYY-MM-DD" -> model -> TokenUsage
     token_by_model_by_date: dict[str, dict[str, TokenUsage]] = field(default_factory=dict)
 
-    # 8. 按分钟分配的 Token（用于 usage quota 预测）
-    # key: "YYYY-MM-DD HH:MM" 本地时间, value: 该分钟的 TokenUsage
-    # 仅保留最近 30 分钟数据以控制内存
+    # 8. Tokens allocated by minute (used for usage quota forecasting)
+    # key: "YYYY-MM-DD HH:MM" local time, value: TokenUsage for that minute
+    # only the most recent 30 minutes are retained to control memory usage
     token_by_minute: dict[str, TokenUsage] = field(default_factory=dict)
 
-    # 9. 编码节奏分析
+    # 9. Coding rhythm analysis
     # key: "morning"|"afternoon"|"evening"|"night"
     # value: {"session_count": int, "token_count": int, "active_minutes": float}
     coding_rhythm: dict[str, dict[str, int | float]] = field(default_factory=dict)
 
-    # 10. 工作模式分布
+    # 10. Work mode distribution
     # key: "Exploration"|"Building"|"Execution", value: session count
     work_mode_distribution: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
 class CacheStats:
-    """缓存命中率分析结果"""
+    """Cache hit rate analysis results"""
     hit_rate: float = 0.0           # 0.0 - 1.0
     grade: str = "na"               # "excellent" | "good" | "fair" | "poor" | "na"
-    grade_label: str = "N/A"        # 显示标签
+    grade_label: str = "N/A"        # display label
     cache_read_tokens: int = 0
-    total_input_tokens: int = 0     # input + cache_read（分母）
-    savings_usd: float = 0.0        # 估算节省费用
+    total_input_tokens: int = 0     # input + cache_read (denominator)
+    savings_usd: float = 0.0        # estimated savings
     by_model: dict[str, float] = field(default_factory=dict)  # model -> hit_rate
 
 
 def _cache_grade(hit_rate: float) -> tuple[str, str]:
-    """根据命中率返回 (grade, grade_label)"""
+    """Return (grade, grade_label) based on hit rate"""
     if hit_rate >= 0.80:
         return "excellent", "Excellent"
     if hit_rate >= 0.60:
@@ -275,19 +275,19 @@ def compute_cache_stats(
     token_usage: TokenUsage,
     token_by_model: dict[str, TokenUsage],
 ) -> CacheStats:
-    """从 TokenUsage 计算缓存命中率统计"""
+    """Compute cache hit rate statistics from TokenUsage"""
     cache_read = token_usage.cache_read_input_tokens
     inp = token_usage.input_tokens
     total_input = inp + cache_read
 
-    # 无缓存数据 → N/A
+    # No cache data → N/A
     if cache_read == 0:
         return CacheStats()
 
     hit_rate = cache_read / total_input if total_input > 0 else 0.0
     grade, grade_label = _cache_grade(hit_rate)
 
-    # 节省费用估算：仅对 Claude 模型计算（按实际模型价差）
+    # Savings estimate: only calculated for Claude models (based on actual model price difference)
     # savings = cache_read_tokens * (input_price - cache_read_price) / 1M
     savings_usd = 0.0
     for model, usage in token_by_model.items():
@@ -297,7 +297,7 @@ def compute_cache_stats(
         savings_per_million = pricing["input"] - pricing["cache_read"]
         savings_usd += usage.cache_read_input_tokens * savings_per_million / 1_000_000
 
-    # 按模型拆分命中率
+    # Hit rate by model
     by_model: dict[str, float] = {}
     for model, usage in token_by_model.items():
         m_total = usage.input_tokens + usage.cache_read_input_tokens
@@ -326,7 +326,7 @@ class GitStats:
     lines_by_lang: dict[str, dict[str, int]] = field(default_factory=dict)
 
 
-# AI commit 检测关键词（commit message 中包含这些表示 AI 参与）
+# AI commit detection keywords (presence in commit message indicates AI involvement)
 _AI_COMMIT_MARKERS = [
     "co-authored-by: claude",
     "co-authored-by: cursor",
@@ -344,18 +344,18 @@ def _collect_git_stats(
     start_time: datetime,
     end_time: datetime,
 ) -> GitStats:
-    """通过 git log 收集会话时间段内的 commit 变更统计，区分 AI/人工 commit"""
+    """Collect commit change statistics during session time window via git log, distinguishing AI/human commits"""
     repo_dir = Path(project_path)
     if not (repo_dir / ".git").exists() and not (repo_dir / ".git").is_file():
         return GitStats()
 
-    # 转为本地时间，前后各扩展 1 分钟避免边界问题
+    # Convert to local time, extending by 1 minute on each side to avoid boundary issues
     local_start = (start_time - timedelta(minutes=1)).astimezone()
     local_end = (end_time + timedelta(minutes=1)).astimezone()
     since = local_start.strftime("%Y-%m-%dT%H:%M:%S")
     until = local_end.strftime("%Y-%m-%dT%H:%M:%S")
 
-    # 用 --format 分隔 hash 和 commit body（用 %x00 作为分隔符）
+    # Use --format to separate hash and commit body (using %x00 as delimiter)
     try:
         result = subprocess.run(
             [
@@ -380,7 +380,7 @@ def _collect_git_stats(
         lambda: {"added": 0, "removed": 0}
     )
 
-    # 按 commit 分段解析
+    # Parse commits segment by segment
     is_ai_commit = False
     commit_added = 0
     commit_removed = 0
@@ -390,35 +390,35 @@ def _collect_git_stats(
         if not line_stripped:
             continue
 
-        # 检测 commit 分隔符（\x00HASH\n...body...\x00）
+        # Detect commit delimiter (\x00HASH\n...body...\x00)
         if "\x00" in line:
-            # 先结算上一个 commit 的统计
+            # Settle stats for the previous commit first
             if stats.commit_count > 0 and is_ai_commit:
                 stats.ai_added += commit_added
                 stats.ai_removed += commit_removed
 
-            # 提取 commit body，判断是否 AI commit
+            # Extract commit body and determine if it is an AI commit
             clean = line.replace("\x00", "")
             if len(clean) >= 40:
                 stats.commit_count += 1
                 commit_added = 0
                 commit_removed = 0
                 is_ai_commit = False
-            # 检查 body 中的 AI 标记
+            # Check for AI markers in the body
             lower = line.lower()
             if any(marker in lower for marker in _AI_COMMIT_MARKERS):
                 is_ai_commit = True
                 stats.ai_commit_count += 1
             continue
 
-        # 检查非分隔行中的 AI 标记（commit body 可能跨多行）
+        # Check for AI markers in non-delimiter lines (commit body may span multiple lines)
         lower = line_stripped.lower()
         if any(marker in lower for marker in _AI_COMMIT_MARKERS):
             if not is_ai_commit:
                 is_ai_commit = True
                 stats.ai_commit_count += 1
 
-        # numstat 行：added\tremoved\tfile_path
+        # numstat line: added\tremoved\tfile_path
         parts = line_stripped.split("\t")
         if len(parts) == 3:
             added_str, removed_str, file_path = parts
@@ -437,7 +437,7 @@ def _collect_git_stats(
             lang_stats[lang]["added"] += added
             lang_stats[lang]["removed"] += removed
 
-    # 结算最后一个 commit
+    # Settle the last commit
     if is_ai_commit:
         stats.ai_added += commit_added
         stats.ai_removed += commit_removed
@@ -447,7 +447,7 @@ def _collect_git_stats(
 
 
 def _time_period(hour: int) -> str:
-    """将小时数映射到时段名称"""
+    """Map hour to period name"""
     if 6 <= hour < 12:
         return "morning"
     if 12 <= hour < 18:
@@ -458,7 +458,7 @@ def _time_period(hour: int) -> str:
 
 
 def classify_work_mode(user_message_count: int, total_added: int, total_removed: int) -> str:
-    """根据 session 特征分类工作模式"""
+    """Classify work mode based on session characteristics"""
     code_per_msg = (total_added + total_removed) / max(user_message_count, 1)
     if code_per_msg > 50:
         return "Execution"
@@ -468,21 +468,21 @@ def classify_work_mode(user_message_count: int, total_added: int, total_removed:
 
 
 def analyze_session(session: Session) -> SessionStats:
-    """分析单个会话，返回统计结果"""
+    """Analyze a single session and return statistics"""
     stats = SessionStats(
         session_id=session.session_id,
         project_path=session.project_path,
     )
 
-    # 构建 tool_use_id → is_error 映射（用于 Skill 成功率统计）
+    # Build tool_use_id → is_error mapping (used for Skill success rate statistics)
     tool_result_errors: dict[str, bool] = {}
     for msg in session.messages:
         if msg.role == "user" and msg.tool_results:
             tool_result_errors.update(msg.tool_results)
 
-    # 构建带时间戳的消息序列，用于时长分析
+    # Build time-stamped message sequence for duration analysis
     # timed_msgs: list of (datetime, role)
-    # role: "user_real" = 真实用户消息, "user_tool" = 工具返回, "assistant"
+    # role: "user_real" = real user message, "user_tool" = tool result, "assistant"
     timed_msgs: list[tuple[datetime, str]] = []
 
     for msg in session.messages:
@@ -498,16 +498,16 @@ def analyze_session(session: Session) -> SessionStats:
         elif msg.role == "assistant":
             timed_msgs.append((ts, "assistant"))
 
-        # -------- 1. 用户指令数 --------
+        # -------- 1. User instruction count --------
         if msg.role == "user" and not msg.is_tool_result and not msg.is_meta:
             stats.user_message_count += 1
 
-        # -------- 2. 工具调用 --------
+        # -------- 2. Tool calls --------
         if msg.role == "assistant":
             for tc in msg.tool_calls:
                 stats.tool_call_total += 1
 
-                # 展开 Skill 和 MCP 工具为具体名称
+                # Expand Skill and MCP tool calls to specific names
                 display_name = tc.name
                 if tc.name == "Skill":
                     skill_name = tc.input.get("skill", "")
@@ -523,7 +523,7 @@ def analyze_session(session: Session) -> SessionStats:
                     stats.tool_call_counts.get(display_name, 0) + 1
                 )
 
-                # -------- 6. Skill 使用统计 --------
+                # -------- 6. Skill usage statistics --------
                 if tc.name == "Skill":
                     skill_name = tc.input.get("skill", "") or "unknown"
                     if skill_name not in stats.skill_stats:
@@ -531,7 +531,7 @@ def analyze_session(session: Session) -> SessionStats:
                     su = stats.skill_stats[skill_name]
                     su.call_count += 1
 
-                    # 成功/失败判定
+                    # Success/failure determination
                     if tc.tool_use_id and tc.tool_use_id in tool_result_errors:
                         if tool_result_errors[tc.tool_use_id]:
                             su.error_count += 1
@@ -540,7 +540,7 @@ def analyze_session(session: Session) -> SessionStats:
                     else:
                         su.unknown_count += 1
 
-                    # 时间分布
+                    # Time distribution
                     call_ts = _parse_ts(tc.timestamp)
                     if call_ts:
                         local_ts = call_ts.astimezone()
@@ -549,7 +549,7 @@ def analyze_session(session: Session) -> SessionStats:
                         su.hourly_dist[hour] = su.hourly_dist.get(hour, 0) + 1
                         su.daily_dist[day] = su.daily_dist.get(day, 0) + 1
 
-                # -------- 4. 代码行数（从 Edit/Write 工具提取） --------
+                # -------- 4. Lines of code (extracted from Edit/Write tools) --------
                 if tc.name == "Write":
                     # Claude: file_path/content; Gemini: file_path/content
                     fp = tc.input.get("file_path", "")
@@ -563,7 +563,7 @@ def analyze_session(session: Session) -> SessionStats:
 
                 elif tc.name == "Edit":
                     # Claude: file_path/old_string/new_string
-                    # Gemini: target_file/code_edit (无 old/new 拆分)
+                    # Gemini: target_file/code_edit (no old/new split)
                     fp = (
                         tc.input.get("file_path", "")
                         or tc.input.get("target_file", "")
@@ -571,7 +571,7 @@ def analyze_session(session: Session) -> SessionStats:
                     old = tc.input.get("old_string", "")
                     new = tc.input.get("new_string", "")
                     if not old and not new:
-                        # Gemini edit_file：只有 code_edit，按新增估算
+                        # Gemini edit_file: only code_edit, estimate as additions
                         code_edit = tc.input.get("code_edit", "")
                         new = code_edit
                     lang = _detect_lang(fp)
@@ -585,7 +585,7 @@ def analyze_session(session: Session) -> SessionStats:
                     )
                     stats.code_changes.append(change)
 
-            # -------- 5. Token 消耗 --------
+            # -------- 5. Token usage --------
             usage = msg.usage
             if usage:
                 inp = _to_int(usage.get("input_tokens", 0))
@@ -609,7 +609,7 @@ def analyze_session(session: Session) -> SessionStats:
                 m.cache_read_input_tokens += cache_read
                 m.cache_creation_input_tokens += cache_create
 
-                # -------- 7. 按消息时间戳归日 --------
+                # -------- 7. Bucket tokens by message timestamp date --------
                 local_date = _get_local_date(msg.timestamp)
                 if local_date:
                     if local_date not in stats.token_by_date:
@@ -631,7 +631,7 @@ def analyze_session(session: Session) -> SessionStats:
                     dm.cache_read_input_tokens += cache_read
                     dm.cache_creation_input_tokens += cache_create
 
-                # -------- 8. 按分钟归集 Token（usage quota 用） --------
+                # -------- 8. Bucket tokens by minute (for usage quota forecasting) --------
                 local_minute = _get_local_minute(msg.timestamp)
                 if local_minute:
                     if local_minute not in stats.token_by_minute:
@@ -642,18 +642,18 @@ def analyze_session(session: Session) -> SessionStats:
                     m.cache_read_input_tokens += cache_read
                     m.cache_creation_input_tokens += cache_create
 
-    # 裁剪 token_by_minute 只保留最近 30 分钟
+    # Trim token_by_minute to retain only the most recent 30 minutes
     if stats.token_by_minute:
         sorted_keys = sorted(stats.token_by_minute.keys())
         if len(sorted_keys) > 30:
             for k in sorted_keys[:-30]:
                 del stats.token_by_minute[k]
 
-    # -------- 3. 时长计算（基于对话轮次） --------
-    # 一轮 = 用户发消息 → AI 处理（可能多次工具调用）→ AI 最终回复
-    # AI 时长 = 每轮中从用户消息到 AI 最后一条响应
-    # 用户时长 = 上一轮 AI 最后响应到本轮用户消息（超过阈值视为离开）
-    # 按时间戳排序，避免 resumed 会话或 subagent 消息导致乱序产生负值
+    # -------- 3. Duration calculation (based on conversation turns) --------
+    # One turn = user sends message → AI processes (may involve multiple tool calls) → AI final reply
+    # AI duration = from user message to AI's last response within each turn
+    # User duration = from previous turn's last AI response to this turn's user message (exceeding threshold = away)
+    # Sort by timestamp to avoid negative values from out-of-order messages in resumed sessions or subagent messages
     timed_msgs.sort(key=lambda x: x[0])
     if timed_msgs:
         stats.start_time = timed_msgs[0][0]
@@ -663,39 +663,39 @@ def analyze_session(session: Session) -> SessionStats:
         user_total = timedelta()
         turn_count = 0
 
-        # 将消息流切分为轮次：每遇到一条 user_real 开启新轮
-        # turn_start: 本轮用户消息的时间
-        # last_ai_end: 上一轮 AI 最后响应的时间
+        # Split message stream into turns: each user_real message starts a new turn
+        # turn_start: timestamp of this turn's user message
+        # last_ai_end: timestamp of the previous turn's last AI response
         turn_start: datetime | None = None
         turn_last_ai: datetime | None = None
-        last_ai_end: datetime | None = None  # 上一轮结束
+        last_ai_end: datetime | None = None  # end of previous turn
 
         for ts, role in timed_msgs:
             if role == "user_real":
-                # 结算上一轮的 AI 时长
+                # Settle AI duration for the previous turn
                 if turn_start is not None and turn_last_ai is not None:
                     delta = turn_last_ai - turn_start
                     if delta.total_seconds() > 0:
                         ai_total += delta
                     turn_count += 1
 
-                # 计算用户时长（上一轮 AI 结束 → 本轮用户消息）
+                # Calculate user duration (previous turn AI end → this turn user message)
                 if last_ai_end is not None:
                     gap = ts - last_ai_end
                     if timedelta() < gap <= IDLE_THRESHOLD:
                         user_total += gap
 
-                # 上一轮终点
+                # End of previous turn
                 if turn_last_ai is not None:
                     last_ai_end = turn_last_ai
 
                 turn_start = ts
                 turn_last_ai = None
             elif role in ("assistant", "user_tool"):
-                # AI 响应或工具返回，都算 AI 工作中
+                # AI response or tool result, both count as AI working
                 turn_last_ai = ts
 
-        # 结算最后一轮
+        # Settle the last turn
         if turn_start is not None and turn_last_ai is not None:
             delta = turn_last_ai - turn_start
             if delta.total_seconds() > 0:
@@ -705,11 +705,11 @@ def analyze_session(session: Session) -> SessionStats:
         stats.ai_duration = ai_total
         stats.user_duration = user_total
         stats.active_duration = ai_total + user_total
-        # total_duration = 活跃时长（而非首尾差），避免 resume 会话跨天导致虚高
+        # total_duration = active duration (not first-to-last gap), to avoid inflated values from cross-day resumed sessions
         stats.total_duration = ai_total + user_total
         stats.turn_count = turn_count
 
-    # -------- 4. 按语言汇总 --------
+    # -------- 4. Aggregate by language --------
     lang_stats: dict[str, dict[str, int]] = defaultdict(
         lambda: {"added": 0, "removed": 0}
     )
@@ -720,7 +720,7 @@ def analyze_session(session: Session) -> SessionStats:
         stats.total_removed += change.removed
     stats.lines_by_lang = dict(lang_stats)
 
-    # -------- 4b. Git 变更统计 --------
+    # -------- 4b. Git change statistics --------
     if stats.start_time and stats.end_time and session.project_path:
         git = _collect_git_stats(
             session.project_path, stats.start_time, stats.end_time
@@ -735,7 +735,7 @@ def analyze_session(session: Session) -> SessionStats:
             stats.git_ai_removed = git.ai_removed
             stats.git_lines_by_lang = git.lines_by_lang
 
-    # -------- 9. 编码节奏分析 --------
+    # -------- 9. Coding rhythm analysis --------
     if stats.start_time:
         period = _time_period(stats.start_time.astimezone().hour)
         active_mins = stats.active_duration.total_seconds() / 60.0
@@ -747,7 +747,7 @@ def analyze_session(session: Session) -> SessionStats:
             }
         }
 
-    # -------- 10. 工作模式分类 --------
+    # -------- 10. Work mode classification --------
     mode = classify_work_mode(
         stats.user_message_count, stats.total_added, stats.total_removed
     )
@@ -757,7 +757,7 @@ def analyze_session(session: Session) -> SessionStats:
 
 
 def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
-    """合并多个会话的统计结果"""
+    """Merge statistics from multiple sessions"""
     merged = SessionStats(session_id="merged", project_path="all")
 
     all_starts = []
@@ -790,7 +790,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
             merged.lines_by_lang[lang]["added"] += counts["added"]
             merged.lines_by_lang[lang]["removed"] += counts["removed"]
 
-        # Git 变更
+        # Git changes
         if s.git_available:
             merged.git_available = True
             merged.git_total_added += s.git_total_added
@@ -805,7 +805,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
                 merged.git_lines_by_lang[lang]["added"] += counts["added"]
                 merged.git_lines_by_lang[lang]["removed"] += counts["removed"]
 
-        # Skill 使用统计
+        # Skill usage statistics
         for name, su in s.skill_stats.items():
             if name not in merged.skill_stats:
                 merged.skill_stats[name] = SkillUsage(name=name)
@@ -824,7 +824,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
         merged.token_usage.cache_read_input_tokens += s.token_usage.cache_read_input_tokens
         merged.token_usage.cache_creation_input_tokens += s.token_usage.cache_creation_input_tokens
 
-        # token_by_date 合并
+        # Merge token_by_date
         for date_key, tu in s.token_by_date.items():
             if date_key not in merged.token_by_date:
                 merged.token_by_date[date_key] = TokenUsage()
@@ -834,7 +834,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
             d.cache_read_input_tokens += tu.cache_read_input_tokens
             d.cache_creation_input_tokens += tu.cache_creation_input_tokens
 
-        # token_by_model_by_date 合并
+        # Merge token_by_model_by_date
         for date_key, model_map in s.token_by_model_by_date.items():
             if date_key not in merged.token_by_model_by_date:
                 merged.token_by_model_by_date[date_key] = {}
@@ -857,7 +857,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
             m.cache_read_input_tokens += usage.cache_read_input_tokens
             m.cache_creation_input_tokens += usage.cache_creation_input_tokens
 
-        # token_by_minute 合并
+        # Merge token_by_minute
         for minute_key, tu in s.token_by_minute.items():
             if minute_key not in merged.token_by_minute:
                 merged.token_by_minute[minute_key] = TokenUsage()
@@ -867,7 +867,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
             m.cache_read_input_tokens += tu.cache_read_input_tokens
             m.cache_creation_input_tokens += tu.cache_creation_input_tokens
 
-        # 编码节奏合并
+        # Merge coding rhythm
         for period, data in s.coding_rhythm.items():
             if period not in merged.coding_rhythm:
                 merged.coding_rhythm[period] = {
@@ -880,13 +880,13 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
                 float(mr["active_minutes"]) + float(data["active_minutes"]), 1
             )
 
-        # 工作模式合并
+        # Merge work mode
         for mode, count in s.work_mode_distribution.items():
             merged.work_mode_distribution[mode] = (
                 merged.work_mode_distribution.get(mode, 0) + count
             )
 
-    # 合并后裁剪 token_by_minute 只保留最近 30 分钟
+    # After merging, trim token_by_minute to retain only the most recent 30 minutes
     if merged.token_by_minute:
         sorted_keys = sorted(merged.token_by_minute.keys())
         if len(sorted_keys) > 30:
@@ -897,7 +897,7 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
         merged.start_time = min(all_starts)
     if all_ends:
         merged.end_time = max(all_ends)
-    # total_duration = 活跃时长之和，而非首尾差
+    # total_duration = sum of active durations, not the first-to-last gap
     merged.total_duration = merged.active_duration
 
     return merged

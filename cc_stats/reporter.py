@@ -1,4 +1,4 @@
-"""生成 Markdown 周报/月报"""
+"""Generate weekly/monthly Markdown reports"""
 
 from __future__ import annotations
 
@@ -65,10 +65,10 @@ def _fmt_cost(n: float) -> str:
 def _daily_token_and_cost(
     stats_list: list[SessionStats], day_key: str
 ) -> tuple[TokenUsage, float]:
-    """计算某一天的 token 用量和费用（从各 session 的 token_by_date 中提取）
+    """Calculate token usage and cost for a given day (extracted from each session's token_by_date)
 
-    对于跨日 session，只取该 session 在 day_key 当天的 token 部分，
-    费用按当天 token 占该 session 总 token 的比例估算。
+    For cross-day sessions, only the token portion for day_key is used;
+    cost is estimated proportionally based on that day's share of the session's total tokens.
     """
     day_usage = TokenUsage()
     day_cost = 0.0
@@ -80,7 +80,7 @@ def _daily_token_and_cost(
         day_usage.output_tokens += usage.output_tokens
         day_usage.cache_read_input_tokens += usage.cache_read_input_tokens
         day_usage.cache_creation_input_tokens += usage.cache_creation_input_tokens
-        # 按当天 token 占比分摊费用
+        # Allocate cost proportionally by that day's token share
         if s.token_usage.total > 0:
             fraction = usage.total / s.token_usage.total
             day_cost += _estimate_cost(s) * fraction
@@ -88,27 +88,27 @@ def _daily_token_and_cost(
 
 
 def generate_report(period: str = "week") -> str:
-    """生成周报或月报 Markdown
+    """Generate weekly or monthly Markdown report
 
     Args:
-        period: "week" 或 "month"
+        period: "week" or "month"
     """
     now = datetime.now(tz=timezone.utc)
     if period == "month":
         since = now - timedelta(days=30)
-        title = "月报"
+        title = "Monthly Report"
         title_en = "Monthly Report"
         days = 30
     else:
         since = now - timedelta(days=7)
-        title = "周报"
+        title = "Weekly Report"
         title_en = "Weekly Report"
         days = 7
 
     start_str = since.astimezone().strftime("%Y-%m-%d")
     end_str = now.astimezone().strftime("%Y-%m-%d")
 
-    # 收集所有会话（Claude + Codex + Gemini）
+    # Collect all sessions (Claude + Codex + Gemini)
     session_files: list[Path] = [
         f for f in find_sessions() if not f.name.startswith("agent-")
     ]
@@ -126,10 +126,10 @@ def generate_report(period: str = "week") -> str:
             if stats.end_time and stats.end_time < since:
                 continue
             all_stats.append(stats)
-            # 按 token_by_date 归日：跨日 session 的数据分配到各自然日
+            # Group by token_by_date: cross-day session data is assigned to each calendar day
             for day_key in stats.token_by_date:
                 daily[day_key].append(stats)
-            # 没有 token 数据时，回退到 start_time 归日
+            # Fall back to start_time grouping when no token data is available
             if not stats.token_by_date and stats.start_time:
                 day_key = stats.start_time.astimezone().strftime("%Y-%m-%d")
                 daily[day_key].append(stats)
@@ -137,19 +137,19 @@ def generate_report(period: str = "week") -> str:
             continue
 
     if not all_stats:
-        return f"# Claude Code {title} ({start_str} ~ {end_str})\n\n> 该时段无会话数据。\n"
+        return f"# Claude Code {title} ({start_str} ~ {end_str})\n\n> No session data for this period.\n"
 
     merged = merge_stats(all_stats) if len(all_stats) > 1 else all_stats[0]
     cost = _estimate_cost(merged)
 
-    # 按项目分组
+    # Group by project
     project_stats: dict[str, list[SessionStats]] = defaultdict(list)
     for s in all_stats:
         proj = s.project_path or "Unknown"
         proj_name = Path(proj).name if proj != "all" else proj
         project_stats[proj_name].append(s)
 
-    # 每日统计
+    # Daily statistics
     daily_lines = []
     today = datetime.now().date()
     for i in range(days - 1, -1, -1):
@@ -158,39 +158,39 @@ def generate_report(period: str = "week") -> str:
         day_stats_list = daily.get(day_key, [])
         if day_stats_list:
             ds = merge_stats(day_stats_list) if len(day_stats_list) > 1 else day_stats_list[0]
-            # 按 token_by_date 取当天的 token，避免跨日 session 重复计数
+            # Use token_by_date for that day's tokens to avoid double-counting cross-day sessions
             day_token_usage, day_cost = _daily_token_and_cost(day_stats_list, day_key)
             daily_lines.append(
                 f"| {day_key} | {len(day_stats_list)} | {ds.user_message_count} | "
                 f"{_fmt_duration(ds.active_duration)} | {_fmt_tokens(day_token_usage.total)} | {_fmt_cost(day_cost)} |"
             )
 
-    # 工具调用 Top 5
+    # Top 5 tool calls
     sorted_tools = sorted(merged.tool_call_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
-    # 语言统计
+    # Language statistics
     sorted_langs = sorted(merged.lines_by_lang.items(), key=lambda x: x[1]["added"], reverse=True)[:5]
 
-    # 生成 Markdown
+    # Generate Markdown
     lines = [
         f"# Claude Code {title}",
         f"",
         f"**{start_str} ~ {end_str}**",
         f"",
-        f"## 概览",
+        f"## Overview",
         f"",
-        f"| 指标 | 数值 |",
+        f"| Metric | Value |",
         f"|------|------|",
-        f"| 会话数 | {len(all_stats)} |",
-        f"| 指令数 | {merged.user_message_count} |",
-        f"| 工具调用 | {merged.tool_call_total} |",
-        f"| 活跃时长 | {_fmt_duration(merged.active_duration)} |",
-        f"| AI 处理 | {_fmt_duration(merged.ai_duration)} |",
-        f"| 用户活跃 | {_fmt_duration(merged.user_duration)} |",
-        f"| Token 消耗 | {_fmt_tokens(merged.token_usage.total)} |",
-        f"| 预估费用 | {_fmt_cost(cost)} |",
-        f"| 代码新增 | +{merged.total_added} |",
-        f"| 代码删除 | -{merged.total_removed} |",
+        f"| Sessions | {len(all_stats)} |",
+        f"| Instructions | {merged.user_message_count} |",
+        f"| Tool Calls | {merged.tool_call_total} |",
+        f"| Active Time | {_fmt_duration(merged.active_duration)} |",
+        f"| AI Processing | {_fmt_duration(merged.ai_duration)} |",
+        f"| User Active | {_fmt_duration(merged.user_duration)} |",
+        f"| Token Usage | {_fmt_tokens(merged.token_usage.total)} |",
+        f"| Est. Cost | {_fmt_cost(cost)} |",
+        f"| Code Added | +{merged.total_added} |",
+        f"| Code Removed | -{merged.total_removed} |",
     ]
 
     if merged.git_available:
@@ -202,9 +202,9 @@ def generate_report(period: str = "week") -> str:
 
     lines += [
         f"",
-        f"## 每日明细",
+        f"## Daily Breakdown",
         f"",
-        f"| 日期 | 会话 | 指令 | 活跃时长 | Token | 费用 |",
+        f"| Date | Sessions | Instructions | Active Time | Token | Cost |",
         f"|------|------|------|----------|-------|------|",
     ]
     lines.extend(daily_lines)
@@ -212,9 +212,9 @@ def generate_report(period: str = "week") -> str:
     if sorted_tools:
         lines += [
             f"",
-            f"## 工具调用 Top 5",
+            f"## Top 5 Tool Calls",
             f"",
-            f"| 工具 | 次数 |",
+            f"| Tool | Count |",
             f"|------|------|",
         ]
         for name, count in sorted_tools:
@@ -223,9 +223,9 @@ def generate_report(period: str = "week") -> str:
     if sorted_langs:
         lines += [
             f"",
-            f"## 代码变更（按语言）",
+            f"## Code Changes (by language)",
             f"",
-            f"| 语言 | 新增 | 删除 | 净增 |",
+            f"| Language | Added | Removed | Net |",
             f"|------|------|------|------|",
         ]
         for lang, counts in sorted_langs:
@@ -236,9 +236,9 @@ def generate_report(period: str = "week") -> str:
     if merged.token_by_model:
         lines += [
             f"",
-            f"## Token 消耗（按模型）",
+            f"## Token Usage (by model)",
             f"",
-            f"| 模型 | Token | 费用 |",
+            f"| Model | Tokens | Cost |",
             f"|------|-------|------|",
         ]
         for model, usage in sorted(merged.token_by_model.items(), key=lambda x: x[1].total, reverse=True):
@@ -253,9 +253,9 @@ def generate_report(period: str = "week") -> str:
     if len(project_stats) > 1:
         lines += [
             f"",
-            f"## 项目分布",
+            f"## Project Distribution",
             f"",
-            f"| 项目 | 会话 | 指令 | 费用 |",
+            f"| Project | Sessions | Instructions | Cost |",
             f"|------|------|------|------|",
         ]
         for proj_name, stats_list in sorted(project_stats.items(), key=lambda x: len(x[1]), reverse=True)[:10]:
@@ -263,7 +263,7 @@ def generate_report(period: str = "week") -> str:
             pc = _estimate_cost(pm)
             lines.append(f"| {proj_name} | {len(stats_list)} | {pm.user_message_count} | {_fmt_cost(pc)} |")
 
-    # 对比上一周期
+    # Compare with previous period
     prev_since = since - timedelta(days=days)
     prev_stats: list[SessionStats] = []
     for f in session_files:
@@ -286,37 +286,37 @@ def generate_report(period: str = "week") -> str:
             sign = "+" if pct >= 0 else ""
             return f"{fmt_fn(curr)} ({sign}{pct:.0f}%)"
 
-        prev_title = f"上{title[0]}对比" if "周" in title or "月" in title else "Previous Period"
+        prev_title = "Previous Period Comparison"
         lines += [
             f"",
             f"## {prev_title}",
             f"",
-            f"| 指标 | 本{title[0]} | 上{title[0]} | 变化 |",
+            f"| Metric | This {title} | Previous {title} | Change |",
             f"|------|------|------|------|",
-            f"| 会话 | {len(all_stats)} | {len(prev_stats)} | {_delta(len(all_stats), len(prev_stats))} |",
-            f"| 指令 | {merged.user_message_count} | {prev_merged.user_message_count} | {_delta(merged.user_message_count, prev_merged.user_message_count)} |",
+            f"| Sessions | {len(all_stats)} | {len(prev_stats)} | {_delta(len(all_stats), len(prev_stats))} |",
+            f"| Instructions | {merged.user_message_count} | {prev_merged.user_message_count} | {_delta(merged.user_message_count, prev_merged.user_message_count)} |",
             f"| Token | {_fmt_tokens(merged.token_usage.total)} | {_fmt_tokens(prev_merged.token_usage.total)} | {_delta(merged.token_usage.total, prev_merged.token_usage.total, _fmt_tokens)} |",
-            f"| 费用 | {_fmt_cost(cost)} | {_fmt_cost(prev_cost)} | {_delta(cost, prev_cost, _fmt_cost)} |",
-            f"| 代码新增 | +{merged.total_added} | +{prev_merged.total_added} | {_delta(merged.total_added, prev_merged.total_added)} |",
+            f"| Cost | {_fmt_cost(cost)} | {_fmt_cost(prev_cost)} | {_delta(cost, prev_cost, _fmt_cost)} |",
+            f"| Code Added | +{merged.total_added} | +{prev_merged.total_added} | {_delta(merged.total_added, prev_merged.total_added)} |",
         ]
 
-    # 成本预测
-    active_days = len([d for d in daily_lines if d])  # 有数据的天数
+    # Cost projection
+    active_days = len([d for d in daily_lines if d])  # Days with data
     if active_days > 0 and cost > 0:
         daily_avg = cost / active_days
         month_projection = daily_avg * 30
         lines += [
             f"",
-            f"## 成本预测",
+            f"## Cost Projection",
             f"",
-            f"| 指标 | 数值 |",
+            f"| Metric | Value |",
             f"|------|------|",
-            f"| 日均费用 | {_fmt_cost(daily_avg)} |",
-            f"| 月度预测 | {_fmt_cost(month_projection)} |",
-            f"| 活跃天数 | {active_days}/{days} 天 |",
+            f"| Daily avg cost | {_fmt_cost(daily_avg)} |",
+            f"| Monthly projection | {_fmt_cost(month_projection)} |",
+            f"| Active days | {active_days}/{days} days |",
         ]
 
-    # 效率指标
+    # Efficiency metrics
     total_tokens = merged.token_usage.total
     total_code = merged.total_added + merged.total_removed
     avg_tokens_per_msg = total_tokens // max(merged.user_message_count, 1)
@@ -325,12 +325,12 @@ def generate_report(period: str = "week") -> str:
     ai_secs = merged.ai_duration.total_seconds()
     ai_ratio = round(ai_secs / max(active_secs, 1) * 100)
 
-    # 效率评分 (0-100)
-    # 代码产出 (40分): code_per_1k_token, 0.5以上满分
+    # Efficiency score (0-100)
+    # Code output (40pts): code_per_1k_token, full score at 0.5+
     code_score = min(40, int(code_per_1k_token / 0.5 * 40))
-    # 指令精准 (30分): avg_tokens_per_msg 越低越好, 50K以下满分
+    # Instruction precision (30pts): lower avg_tokens_per_msg is better, full score below 50K
     precision_score = max(0, min(30, int((1 - min(avg_tokens_per_msg, 200_000) / 200_000) * 30)))
-    # AI利用率 (30分): 70%以上满分
+    # AI utilization (30pts): full score at 70%+
     util_score = min(30, int(ai_ratio / 70 * 30))
     total_score = code_score + precision_score + util_score
 
@@ -338,15 +338,15 @@ def generate_report(period: str = "week") -> str:
 
     lines += [
         f"",
-        f"## 效率评分",
+        f"## Efficiency Score",
         f"",
         f"**{grade} ({total_score}/100)**",
         f"",
-        f"| 维度 | 数值 | 得分 |",
+        f"| Dimension | Value | Score |",
         f"|------|------|------|",
-        f"| 代码产出率 | {code_per_1k_token} 行/K Token | {code_score}/40 |",
-        f"| 指令精准度 | {_fmt_tokens(avg_tokens_per_msg)} Token/条 | {precision_score}/30 |",
-        f"| AI 利用率 | {ai_ratio}% | {util_score}/30 |",
+        f"| Code output rate | {code_per_1k_token} lines/K Token | {code_score}/40 |",
+        f"| Instruction precision | {_fmt_tokens(avg_tokens_per_msg)} Token/msg | {precision_score}/30 |",
+        f"| AI utilization | {ai_ratio}% | {util_score}/30 |",
     ]
 
     lines += [

@@ -1,4 +1,4 @@
-"""格式化统计结果输出（带 ANSI 色彩）"""
+"""Format statistics output with ANSI colors"""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from .analyzer import (
 from .rate_limiter import RateLimitStatus
 
 
-# ── ANSI 色彩 ──────────────────────────────────────────────
+# ── ANSI colors ────────────────────────────────────────────
 def _supports_color() -> bool:
-    """检测终端是否支持色彩"""
+    """Detect whether the terminal supports color"""
     if os.environ.get("NO_COLOR"):
         return False
     if os.environ.get("FORCE_COLOR"):
@@ -29,13 +29,13 @@ _COLOR = _supports_color()
 
 
 def _c(code: str, text: str) -> str:
-    """给文本加 ANSI 色彩"""
+    """Apply ANSI color to text"""
     if not _COLOR:
         return text
     return f"\033[{code}m{text}\033[0m"
 
 
-# 常用颜色快捷方式
+# Common color shortcuts
 def _bold(t: str) -> str: return _c("1", t)
 def _dim(t: str) -> str: return _c("2", t)
 def _cyan(t: str) -> str: return _c("36", t)
@@ -49,10 +49,10 @@ def _cyan_bold(t: str) -> str: return _c("1;36", t)
 def _green_bold(t: str) -> str: return _c("1;32", t)
 
 
-# ── 格式化辅助 ─────────────────────────────────────────────
+# ── Formatting helpers ─────────────────────────────────────
 
 def _fmt_duration(td: timedelta) -> str:
-    """将 timedelta 格式化为可读字符串"""
+    """Format a timedelta into a human-readable string"""
     total_seconds = int(td.total_seconds())
     if total_seconds < 0:
         return "0s"
@@ -69,7 +69,7 @@ def _fmt_duration(td: timedelta) -> str:
 
 
 def _fmt_tokens(n: int) -> str:
-    """格式化 token 数量"""
+    """Format token count"""
     if n >= 1_000_000_000:
         return f"{n / 1_000_000_000:.1f}B"
     if n >= 1_000_000:
@@ -80,7 +80,7 @@ def _fmt_tokens(n: int) -> str:
 
 
 def _bar(value: int, max_value: int, width: int = 20) -> str:
-    """生成带颜色的柱状图"""
+    """Generate a colored bar chart"""
     if max_value == 0:
         return ""
     filled = int(value / max_value * width)
@@ -90,7 +90,7 @@ def _bar(value: int, max_value: int, width: int = 20) -> str:
 
 
 def _net_str(net: int) -> str:
-    """格式化净增数（带颜色）"""
+    """Format net change with color"""
     if net > 0:
         return _green(f"+{net}")
     elif net < 0:
@@ -98,7 +98,7 @@ def _net_str(net: int) -> str:
     return _dim("0")
 
 
-# ── 缓存命中率 ─────────────────────────────────────────────
+# ── Cache hit rate ─────────────────────────────────────────
 
 _CACHE_GRADE_COLORS = {
     "excellent": _green,
@@ -118,13 +118,13 @@ _CACHE_GRADE_TIPS = {
 
 
 def format_cache_stats(cache: CacheStats) -> str:
-    """格式化缓存命中率分析子区块"""
+    """Format cache hit rate analysis sub-block"""
     lines: list[str] = []
 
     color_fn = _CACHE_GRADE_COLORS.get(cache.grade, _dim)
     tip = _CACHE_GRADE_TIPS.get(cache.grade, "")
 
-    lines.append(f"  {_dim('缓存命中率:')}")
+    lines.append(f"  {_dim('Cache hit rate:')}")
 
     if cache.grade == "na":
         lines.append(f"    {_dim('N/A')} — {_dim(tip)}")
@@ -139,10 +139,10 @@ def format_cache_stats(cache: CacheStats) -> str:
     )
 
     if cache.savings_usd > 0:
-        lines.append(f"    节省费用: {_green(f'~${cache.savings_usd:.2f}')}")
+        lines.append(f"    Savings: {_green(f'~${cache.savings_usd:.2f}')}")
 
     if len(cache.by_model) > 1:
-        lines.append(f"    {_dim('按模型:')}")
+        lines.append(f"    {_dim('By model:')}")
         for model, rate in sorted(cache.by_model.items(), key=lambda x: x[1], reverse=True):
             m_color = _CACHE_GRADE_COLORS.get(_cache_grade_key(rate), _dim)
             lines.append(f"      {_cyan(model)}: {m_color(f'{rate * 100:.1f}%')}")
@@ -152,7 +152,7 @@ def format_cache_stats(cache: CacheStats) -> str:
 
 
 def _cache_grade_key(hit_rate: float) -> str:
-    """返回命中率对应的 grade key（用于颜色查找）"""
+    """Return the grade key for a given hit rate (used for color lookup)"""
     if hit_rate >= 0.80:
         return "excellent"
     if hit_rate >= 0.60:
@@ -162,41 +162,41 @@ def _cache_grade_key(hit_rate: float) -> str:
     return "poor"
 
 
-# ── 主格式化 ───────────────────────────────────────────────
+# ── Main formatter ─────────────────────────────────────────
 
 def format_stats(stats: SessionStats, session_count: int = 1) -> str:
-    """将统计结果格式化为终端输出"""
+    """Format statistics results for terminal output"""
     lines: list[str] = []
     sep = _dim("─" * 60)
 
     # ── Header ──
     lines.append("")
     lines.append(_cyan("  ╔══════════════════════════════════════════════════════════╗"))
-    lines.append(_cyan("  ║") + _white_bold("        Claude Code 会话统计报告") + "                   " + _cyan("║"))
+    lines.append(_cyan("  ║") + _white_bold("          Claude Code Session Report") + "                 " + _cyan("║"))
     lines.append(_cyan("  ╚══════════════════════════════════════════════════════════╝"))
     lines.append("")
 
     if stats.project_path and stats.project_path != "all":
-        lines.append(f"  {_dim('项目:')} {_bold(stats.project_path)}")
+        lines.append(f"  {_dim('Project:')} {_bold(stats.project_path)}")
     if session_count > 1:
-        lines.append(f"  {_dim('会话数:')} {_bold(str(session_count))}")
+        lines.append(f"  {_dim('Sessions:')} {_bold(str(session_count))}")
     if stats.start_time:
         start_local = stats.start_time.astimezone()
         end_local = stats.end_time.astimezone() if stats.end_time else None
         end_str = end_local.strftime('%Y-%m-%d %H:%M') if end_local else '?'
-        lines.append(f"  {_dim('时间范围:')} {start_local.strftime('%Y-%m-%d %H:%M')} ~ {end_str}")
+        lines.append(f"  {_dim('Time range:')} {start_local.strftime('%Y-%m-%d %H:%M')} ~ {end_str}")
     lines.append("")
 
-    # ── ① 用户指令数 ──
-    lines.append(f"  {_cyan_bold('①')} {_bold('用户指令数')}")
+    # ── ① User Instructions ──
+    lines.append(f"  {_cyan_bold('①')} {_bold('User Instructions')}")
     lines.append(sep)
-    lines.append(f"  对话轮次: {_yellow(str(stats.user_message_count))}")
+    lines.append(f"  Conversation turns: {_yellow(str(stats.user_message_count))}")
     lines.append("")
 
-    # ── ② AI 工具调用 ──
-    lines.append(f"  {_cyan_bold('②')} {_bold('AI 工具调用')}")
+    # ── ② AI Tool Calls ──
+    lines.append(f"  {_cyan_bold('②')} {_bold('AI Tool Calls')}")
     lines.append(sep)
-    lines.append(f"  总调用次数: {_yellow(str(stats.tool_call_total))}")
+    lines.append(f"  Total calls: {_yellow(str(stats.tool_call_total))}")
     lines.append("")
     if stats.tool_call_counts:
         sorted_tools = sorted(
@@ -214,22 +214,22 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
             )
     lines.append("")
 
-    # ── ③ 开发时长 ──
-    lines.append(f"  {_cyan_bold('③')} {_bold('开发时长')}")
+    # ── ③ Dev Time ──
+    lines.append(f"  {_cyan_bold('③')} {_bold('Dev Time')}")
     lines.append(sep)
-    lines.append(f"  活跃时长:     {_green_bold(_fmt_duration(stats.active_duration))}")
-    lines.append(f"    {_blue('AI 处理:')}    {_blue(_fmt_duration(stats.ai_duration))}")
-    lines.append(f"    {_magenta('用户活跃:')}  {_magenta(_fmt_duration(stats.user_duration))}")
+    lines.append(f"  Active time:     {_green_bold(_fmt_duration(stats.active_duration))}")
+    lines.append(f"    {_blue('AI processing:')}    {_blue(_fmt_duration(stats.ai_duration))}")
+    lines.append(f"    {_magenta('User active:')}  {_magenta(_fmt_duration(stats.user_duration))}")
     if stats.active_duration.total_seconds() > 0:
         ai_ratio = stats.ai_duration.total_seconds() / stats.active_duration.total_seconds() * 100
-        lines.append(f"  AI 占比:      {_blue(f'{ai_ratio:.0f}%')}")
+        lines.append(f"  AI ratio:      {_blue(f'{ai_ratio:.0f}%')}")
     if stats.turn_count:
         avg_ai = stats.ai_duration / stats.turn_count
-        lines.append(f"  平均轮次耗时: {_fmt_duration(avg_ai)}/轮 {_dim(f'({stats.turn_count} 轮)')}")
+        lines.append(f"  Avg turn time: {_fmt_duration(avg_ai)}/turn {_dim(f'({stats.turn_count} turns)')}")
     lines.append("")
 
-    # ── ④ 代码变更 ──
-    lines.append(f"  {_cyan_bold('④')} {_bold('代码变更')}")
+    # ── ④ Code Changes ──
+    lines.append(f"  {_cyan_bold('④')} {_bold('Code Changes')}")
     lines.append(sep)
 
     if stats.git_available:
@@ -239,8 +239,8 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
             if stats.git_ai_commit_count > 0
             else ""
         )
-        lines.append(f"  {_yellow('[Git 已提交]')}  {stats.git_commit_count} 个 commit{_cyan(ai_pct)}")
-        lines.append(f"  总新增: {_green(f'+{stats.git_total_added}')}  总删除: {_red(f'-{stats.git_total_removed}')}  净增: {_net_str(git_net)}")
+        lines.append(f"  {_yellow('[Git committed]')}  {stats.git_commit_count} commits{_cyan(ai_pct)}")
+        lines.append(f"  Added: {_green(f'+{stats.git_total_added}')}  Removed: {_red(f'-{stats.git_total_removed}')}  Net: {_net_str(git_net)}")
         if stats.git_ai_commit_count > 0:
             ai_code_pct = round(
                 (stats.git_ai_added + stats.git_ai_removed)
@@ -248,8 +248,8 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
                 * 100
             )
             lines.append(
-                f"  AI 代码: {_cyan(f'+{stats.git_ai_added}')} {_cyan(f'-{stats.git_ai_removed}')}  "
-                f"占比: {_cyan(f'{ai_code_pct}%')}"
+                f"  AI code: {_cyan(f'+{stats.git_ai_added}')} {_cyan(f'-{stats.git_ai_removed}')}  "
+                f"Share: {_cyan(f'{ai_code_pct}%')}"
             )
         lines.append("")
 
@@ -270,8 +270,8 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
         lines.append("")
 
     ai_net = stats.total_added - stats.total_removed
-    lines.append(f"  {_blue('[AI 工具变更]')}  {_dim('来自 Edit/Write 调用')}")
-    lines.append(f"  总新增: {_green(f'+{stats.total_added}')}  总删除: {_red(f'-{stats.total_removed}')}  净增: {_net_str(ai_net)}")
+    lines.append(f"  {_blue('[AI tool changes]')}  {_dim('from Edit/Write calls')}")
+    lines.append(f"  Added: {_green(f'+{stats.total_added}')}  Removed: {_red(f'-{stats.total_removed}')}  Net: {_net_str(ai_net)}")
     lines.append("")
 
     if stats.lines_by_lang:
@@ -290,8 +290,8 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
             )
     lines.append("")
 
-    # ── ⑤ Token 消耗 ──
-    lines.append(f"  {_cyan_bold('⑤')} {_bold('Token 消耗')}")
+    # ── ⑤ Token Usage ──
+    lines.append(f"  {_cyan_bold('⑤')} {_bold('Token Usage')}")
     lines.append(sep)
     tu = stats.token_usage
     lines.append(f"  Input tokens:          {_fmt_tokens(tu.input_tokens):>10}")
@@ -299,11 +299,11 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
     lines.append(f"  Cache read tokens:     {_dim(_fmt_tokens(tu.cache_read_input_tokens)):>22}")
     lines.append(f"  Cache creation tokens: {_dim(_fmt_tokens(tu.cache_creation_input_tokens)):>22}")
     lines.append(f"  {_dim('─' * 40)}")
-    lines.append(f"  合计:                  {_white_bold(_fmt_tokens(tu.total)):>22}")
+    lines.append(f"  Total:                 {_white_bold(_fmt_tokens(tu.total)):>22}")
     lines.append("")
 
     if stats.token_by_model:
-        lines.append(f"  {_dim('按模型拆分:')}")
+        lines.append(f"  {_dim('By model:')}")
         for model, usage in sorted(stats.token_by_model.items()):
             if usage.total == 0:
                 continue
@@ -316,11 +316,11 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
             )
     lines.append("")
 
-    # ── 缓存命中率分析（⑤ 子区块） ──
+    # ── Cache hit rate analysis (⑤ sub-block) ──
     cache = compute_cache_stats(stats.token_usage, stats.token_by_model)
     lines.append(format_cache_stats(cache))
 
-    # ⑥ 效率评分
+    # ⑥ Efficiency Score
     total_tokens = stats.token_usage.total
     total_code = stats.total_added + stats.total_removed
     if total_tokens > 0 and stats.user_message_count > 0:
@@ -337,20 +337,20 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
         grade = "S" if total_score >= 90 else "A" if total_score >= 75 else "B" if total_score >= 60 else "C" if total_score >= 40 else "D"
 
         grade_color = _green if grade in ("S", "A") else _yellow if grade == "B" else _red
-        lines.append(f"  {_bold('⑥ 效率评分')}")
+        lines.append(f"  {_bold('⑥ Efficiency Score')}")
         lines.append("─" * 60)
-        lines.append(f"  评分: {grade_color(f'{grade} ({total_score}/100)')}")
-        lines.append(f"  代码产出: {_fmt_tokens(total_code)} 行 / {_fmt_tokens(total_tokens)} Token = {_cyan(f'{code_per_1k} 行/K')}")
-        lines.append(f"  指令精准: {_fmt_tokens(avg_tokens_per_msg)} Token/条")
-        lines.append(f"  AI 利用率: {ai_ratio}%")
+        lines.append(f"  Score: {grade_color(f'{grade} ({total_score}/100)')}")
+        lines.append(f"  Code output: {_fmt_tokens(total_code)} lines / {_fmt_tokens(total_tokens)} Token = {_cyan(f'{code_per_1k} lines/K')}")
+        lines.append(f"  Instruction precision: {_fmt_tokens(avg_tokens_per_msg)} Token/msg")
+        lines.append(f"  AI utilization: {ai_ratio}%")
         lines.append("")
 
-    # ── ⑧ 编码节奏与工作模式 ──
+    # ── ⑧ Coding Rhythm & Work Mode ──
     rhythm_block = format_coding_rhythm(stats)
     if rhythm_block:
         lines.append(rhythm_block)
 
-    # ── ⑨ Usage Quota 预测 ──
+    # ── ⑨ Usage Quota Forecast ──
     from .rate_limiter import analyze_rate_limit
     rl_status = analyze_rate_limit(stats)
     rl_block = format_rate_limit(rl_status)
@@ -377,7 +377,7 @@ _MODE_ICONS = {
 
 
 def format_coding_rhythm(stats: SessionStats) -> str:
-    """格式化编码节奏与工作模式区块（⑧）"""
+    """Format the coding rhythm and work mode block (⑧)"""
     has_rhythm = bool(stats.coding_rhythm)
     has_modes = bool(stats.work_mode_distribution)
     if not has_rhythm and not has_modes:
@@ -386,12 +386,12 @@ def format_coding_rhythm(stats: SessionStats) -> str:
     lines: list[str] = []
     sep = _dim("─" * 60)
 
-    lines.append(f"  {_cyan_bold('⑧')} {_bold('编码节奏与工作模式')}")
+    lines.append(f"  {_cyan_bold('⑧')} {_bold('Coding Rhythm & Work Mode')}")
     lines.append(sep)
 
-    # Coding Rhythm — 水平柱状图（按 token 数量）
+    # Coding Rhythm — horizontal bar chart (by token count)
     if has_rhythm:
-        lines.append(f"  {_dim('编码节奏 (按时段):')}")
+        lines.append(f"  {_dim('Coding rhythm (by period):')}")
 
         max_tokens = max(
             (int(d.get("token_count", 0)) for d in stats.coding_rhythm.values()),
@@ -430,7 +430,7 @@ def format_coding_rhythm(stats: SessionStats) -> str:
 
     # Work Mode Distribution
     if has_modes:
-        lines.append(f"  {_dim('工作模式分布:')}")
+        lines.append(f"  {_dim('Work mode distribution:')}")
         total_sessions = sum(stats.work_mode_distribution.values())
         for mode in ("Exploration", "Building", "Execution"):
             count = stats.work_mode_distribution.get(mode, 0)
@@ -450,9 +450,9 @@ def format_coding_rhythm(stats: SessionStats) -> str:
 
 
 def format_rate_limit(status: RateLimitStatus) -> str:
-    """格式化 Usage Quota 预测结果
+    """Format Usage Quota forecast result
 
-    idle 时返回空字符串（不显示区块）。
+    Returns empty string when idle (block not displayed).
     """
     if status.status == "idle":
         return ""
@@ -463,7 +463,7 @@ def format_rate_limit(status: RateLimitStatus) -> str:
     lines.append(f"  {_cyan_bold('⑨')} {_bold('Usage Quota Forecast')}")
     lines.append(sep)
 
-    # 状态标签
+    # Status label
     if status.status == "safe":
         status_label = f"\u2705 {_green('SAFE')}"
     elif status.status == "warning":
@@ -473,11 +473,11 @@ def format_rate_limit(status: RateLimitStatus) -> str:
 
     lines.append(f"  Status:      {status_label}")
 
-    # 速率
+    # Rate
     rate_str = f"{status.rate_per_min:,.0f} tokens/min (5-min window)"
     lines.append(f"  Rate:        {_yellow(rate_str)}")
 
-    # 窗口使用量
+    # Window usage
     pct_display = status.pct * 100
     pct_str = f"{pct_display:.0f}%"
     if status.pct >= 0.85:
@@ -517,42 +517,42 @@ def format_rate_limit(status: RateLimitStatus) -> str:
 
 
 def format_skill_stats(stats: SessionStats, session_count: int = 1) -> str:
-    """将 Skill 使用统计格式化为终端输出"""
+    """Format Skill usage statistics for terminal output"""
     lines: list[str] = []
     sep = _dim("─" * 60)
 
     # Header
     lines.append("")
     lines.append(_cyan("  ╔══════════════════════════════════════════════════════════╗"))
-    lines.append(_cyan("  ║") + _white_bold("          Skill 使用统计报告") + "                     " + _cyan("║"))
+    lines.append(_cyan("  ║") + _white_bold("            Skill Usage Report") + "                   " + _cyan("║"))
     lines.append(_cyan("  ╚══════════════════════════════════════════════════════════╝"))
     lines.append("")
 
     if stats.project_path and stats.project_path != "all":
-        lines.append(f"  {_dim('项目:')} {_bold(stats.project_path)}")
+        lines.append(f"  {_dim('Repo:')} {_bold(stats.project_path)}")
     if session_count > 1:
-        lines.append(f"  {_dim('会话数:')} {_bold(str(session_count))}")
+        lines.append(f"  {_dim('Sessions:')} {_bold(str(session_count))}")
     if stats.start_time:
         start_local = stats.start_time.astimezone()
         end_local = stats.end_time.astimezone() if stats.end_time else None
         end_str = end_local.strftime('%Y-%m-%d %H:%M') if end_local else '?'
-        lines.append(f"  {_dim('时间范围:')} {start_local.strftime('%Y-%m-%d %H:%M')} ~ {end_str}")
+        lines.append(f"  {_dim('Time range:')} {start_local.strftime('%Y-%m-%d %H:%M')} ~ {end_str}")
     lines.append("")
 
     if not stats.skill_stats:
-        lines.append(f"  {_dim('未发现 Skill 调用记录')}")
+        lines.append(f"  {_dim('No Skill invocations found')}")
         lines.append("")
         return "\n".join(lines)
 
-    # ── ① 调用次数排行 ──
+    # ── ① Call count rankings ──
     sorted_skills = sorted(
         stats.skill_stats.values(), key=lambda s: s.call_count, reverse=True
     )
     total_calls = sum(s.call_count for s in sorted_skills)
 
-    lines.append(f"  {_cyan_bold('①')} {_bold('Skill 调用排行')}")
+    lines.append(f"  {_cyan_bold('①')} {_bold('Skill Usage Rankings')}")
     lines.append(sep)
-    lines.append(f"  Skill 总数: {_yellow(str(len(sorted_skills)))}  总调用: {_yellow(str(total_calls))}")
+    lines.append(f"  Skills: {_yellow(str(len(sorted_skills)))}  Total calls: {_yellow(str(total_calls))}")
     lines.append("")
 
     max_count = sorted_skills[0].call_count if sorted_skills else 1
@@ -565,8 +565,8 @@ def format_skill_stats(stats: SessionStats, session_count: int = 1) -> str:
         )
     lines.append("")
 
-    # ── ② 成功率 ──
-    lines.append(f"  {_cyan_bold('②')} {_bold('成功/失败率')}")
+    # ── ② Success rate ──
+    lines.append(f"  {_cyan_bold('②')} {_bold('Success/Failure Rate')}")
     lines.append(sep)
 
     for su in sorted_skills:
@@ -588,15 +588,15 @@ def format_skill_stats(stats: SessionStats, session_count: int = 1) -> str:
         detail = " ".join(parts)
 
         lines.append(
-            f"  {su.name:<{max_name_len}}  成功率: {rate_str}  ({detail})"
+            f"  {su.name:<{max_name_len}}  Success rate: {rate_str}  ({detail})"
         )
     lines.append("")
 
-    # ── ③ 时间分布（按小时） ──
-    lines.append(f"  {_cyan_bold('③')} {_bold('时间分布（按小时）')}")
+    # ── ③ Time distribution (by hour) ──
+    lines.append(f"  {_cyan_bold('③')} {_bold('Time Distribution (by hour)')}")
     lines.append(sep)
 
-    # 合并所有 skill 的小时分布
+    # Aggregate hourly distribution across all skills
     hourly_total: dict[int, int] = {}
     for su in sorted_skills:
         for h, c in su.hourly_dist.items():
@@ -611,17 +611,17 @@ def format_skill_stats(stats: SessionStats, session_count: int = 1) -> str:
             bar = _bar(count, max_hourly, 20)
             lines.append(f"  {hour:02d}:00  {bar} {_yellow(f'{count:>3}')}")
     else:
-        lines.append(f"  {_dim('无时间分布数据')}")
+        lines.append(f"  {_dim('No time distribution data')}")
     lines.append("")
 
-    # ── ④ 时间分布（按天） ──
+    # ── ④ Time distribution (by day) ──
     daily_total: dict[str, int] = {}
     for su in sorted_skills:
         for d, c in su.daily_dist.items():
             daily_total[d] = daily_total.get(d, 0) + c
 
     if daily_total:
-        lines.append(f"  {_cyan_bold('④')} {_bold('时间分布（按天）')}")
+        lines.append(f"  {_cyan_bold('④')} {_bold('Time Distribution (by day)')}")
         lines.append(sep)
 
         sorted_days = sorted(daily_total.items())
@@ -635,13 +635,13 @@ def format_skill_stats(stats: SessionStats, session_count: int = 1) -> str:
 
 
 def format_git_integration(result) -> str:
-    """格式化 Git 集成分析结果（Top Commits by AI Cost）
+    """Format Git integration analysis results (Top Commits by AI Cost)
 
     Args:
-        result: GitIntegrationResult 实例
+        result: GitIntegrationResult instance
 
     Returns:
-        格式化的终端输出字符串
+        Formatted terminal output string
     """
     from .git_integration import GitIntegrationResult
 
@@ -654,7 +654,7 @@ def format_git_integration(result) -> str:
     lines.append(_cyan("  ╚══════════════════════════════════════════════════════════╝"))
     lines.append("")
 
-    lines.append(f"  {_dim('仓库:')} {_bold(result.repo_path)}")
+    lines.append(f"  {_dim('Repo:')} {_bold(result.repo_path)}")
     lines.append(f"  {_dim('Commits:')} {_bold(str(result.total_commits))}")
     lines.append(f"  {_dim('Sessions matched:')} {_bold(str(result.sessions_matched))}")
     lines.append(

@@ -1,4 +1,4 @@
-"""Webhook 通知：推送统计摘要到飞书/钉钉/Slack"""
+"""Webhook notifications: push daily stats to Feishu/DingTalk/Slack"""
 
 from __future__ import annotations
 
@@ -18,10 +18,10 @@ from .pricing import estimate_cost_from_token_by_model
 
 
 def _collect_today_stats() -> SessionStats | None:
-    """收集今天的统计数据（Claude + Codex + Gemini）
+    """Collect today's statistics (Claude + Codex + Gemini)
 
-    使用 token_by_date 按消息时间戳归日：只要 session 中有消息
-    落在今天，该 session 就会被纳入统计。
+    Uses token_by_date grouped by message timestamp: any session that has
+    a message falling on today will be included in the statistics.
     """
     today_key = datetime.now().strftime("%Y-%m-%d")
     all_files: list = list(find_sessions())
@@ -33,9 +33,9 @@ def _collect_today_stats() -> SessionStats | None:
         try:
             session = parse_session_file(f)
             stats = analyze_session(session)
-            # 按消息时间戳归日：token_by_date 包含今天的 key
+            # Group by message timestamp: token_by_date contains today's key
             has_today_tokens = today_key in stats.token_by_date
-            # 回退：无 token_by_date 时，按 end_time 判断
+            # Fallback: use end_time when token_by_date is unavailable
             if not has_today_tokens and not stats.token_by_date:
                 today_start = datetime.now(tz=timezone.utc).replace(
                     hour=0, minute=0, second=0, microsecond=0
@@ -76,7 +76,7 @@ def _fmt_duration(seconds: float) -> str:
 
 
 def _build_message(stats: SessionStats) -> dict:
-    """构建通知消息内容"""
+    """Build notification message content"""
     cost = _estimate_cost(stats)
     today = datetime.now().strftime("%Y-%m-%d")
     active = stats.active_duration.total_seconds()
@@ -85,7 +85,7 @@ def _build_message(stats: SessionStats) -> dict:
         if active > 0 else 0
     )
 
-    # 效率评分
+    # Efficiency score
     total_tokens = stats.token_usage.total
     total_code = stats.total_added + stats.total_removed
     code_per_1k = round(total_code / max(total_tokens / 1000, 1), 2) if total_tokens > 0 else 0
@@ -113,25 +113,25 @@ def _build_message(stats: SessionStats) -> dict:
 
 
 def send_feishu(webhook_url: str, stats: SessionStats) -> bool:
-    """发送飞书机器人通知"""
+    """Send Feishu bot notification"""
     msg = _build_message(stats)
     payload = {
         "msg_type": "interactive",
         "card": {
             "header": {
-                "title": {"tag": "plain_text", "content": f"Claude Code 日报 {msg['date']}"},
+                "title": {"tag": "plain_text", "content": f"Claude Code Daily Report {msg['date']}"},
                 "template": "blue",
             },
             "elements": [
                 {
                     "tag": "div",
                     "fields": [
-                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**会话数**\n{msg['instructions']} 条指令"}},
-                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**活跃时长**\n{msg['active_time']} (AI {msg['ai_ratio']})"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**Sessions**\n{msg['instructions']} instructions"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**Active Time**\n{msg['active_time']} (AI {msg['ai_ratio']})"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**Token**\n{msg['tokens']}"}},
-                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**费用**\n{msg['cost']}"}},
-                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**代码**\n+{msg['code_added']} / -{msg['code_removed']}"}},
-                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**效率**\n{msg['grade']} ({msg['score']}/100)"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**Cost**\n{msg['cost']}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**Code**\n+{msg['code_added']} / -{msg['code_removed']}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**Efficiency**\n{msg['grade']} ({msg['score']}/100)"}},
                     ],
                 },
             ],
@@ -141,26 +141,26 @@ def send_feishu(webhook_url: str, stats: SessionStats) -> bool:
 
 
 def send_dingtalk(webhook_url: str, stats: SessionStats) -> bool:
-    """发送钉钉机器人通知"""
+    """Send DingTalk bot notification"""
     msg = _build_message(stats)
     text = (
-        f"### Claude Code 日报 {msg['date']}\n\n"
-        f"| 指标 | 数值 |\n"
+        f"### Claude Code Daily Report {msg['date']}\n\n"
+        f"| Metric | Value |\n"
         f"|------|------|\n"
-        f"| 指令数 | {msg['instructions']} |\n"
-        f"| 活跃时长 | {msg['active_time']} (AI {msg['ai_ratio']}) |\n"
+        f"| Instructions | {msg['instructions']} |\n"
+        f"| Active Time | {msg['active_time']} (AI {msg['ai_ratio']}) |\n"
         f"| Token | {msg['tokens']} |\n"
-        f"| 费用 | {msg['cost']} |\n"
-        f"| 代码 | +{msg['code_added']} / -{msg['code_removed']} |\n"
-        f"| 效率 | {msg['grade']} ({msg['score']}/100) |\n"
+        f"| Cost | {msg['cost']} |\n"
+        f"| Code | +{msg['code_added']} / -{msg['code_removed']} |\n"
+        f"| Efficiency | {msg['grade']} ({msg['score']}/100) |\n"
         f"| Git | {msg['git_commits']} commits |"
     )
-    payload = {"msgtype": "markdown", "markdown": {"title": "Claude Code 日报", "text": text}}
+    payload = {"msgtype": "markdown", "markdown": {"title": "Claude Code Daily Report", "text": text}}
     return _post_json(webhook_url, payload)
 
 
 def send_slack(webhook_url: str, stats: SessionStats) -> bool:
-    """发送 Slack 通知"""
+    """Send Slack notification"""
     msg = _build_message(stats)
     text = (
         f"*Claude Code Daily Report {msg['date']}*\n"
@@ -174,7 +174,7 @@ def send_slack(webhook_url: str, stats: SessionStats) -> bool:
 
 
 def _post_json(url: str, payload: dict) -> bool:
-    """POST JSON 到 webhook URL"""
+    """POST JSON to webhook URL"""
     data = json.dumps(payload, ensure_ascii=False).encode()
     req = urllib.request.Request(
         url, data=data,
@@ -185,23 +185,23 @@ def _post_json(url: str, payload: dict) -> bool:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status == 200
     except (urllib.error.URLError, OSError) as e:
-        print(f"Webhook 发送失败: {e}")
+        print(f"Webhook send failed: {e}")
         return False
 
 
 def send_notification(webhook_url: str, platform: str = "auto") -> bool:
-    """发送今日统计通知
+    """Send today's statistics notification
 
     Args:
         webhook_url: Webhook URL
-        platform: feishu/dingtalk/slack/auto (自动检测)
+        platform: feishu/dingtalk/slack/auto (auto-detect)
     """
     stats = _collect_today_stats()
     if not stats:
-        print("今天暂无会话数据")
+        print("No session data for today")
         return False
 
-    # 自动检测平台
+    # Auto-detect platform
     if platform == "auto":
         if "feishu.cn" in webhook_url or "larksuite.com" in webhook_url:
             platform = "feishu"
@@ -210,7 +210,7 @@ def send_notification(webhook_url: str, platform: str = "auto") -> bool:
         elif "hooks.slack.com" in webhook_url:
             platform = "slack"
         else:
-            print("无法自动检测平台，请指定 --platform feishu/dingtalk/slack")
+            print("Cannot auto-detect platform, please specify --platform feishu/dingtalk/slack")
             return False
 
     senders = {
@@ -220,10 +220,10 @@ def send_notification(webhook_url: str, platform: str = "auto") -> bool:
     }
     sender = senders.get(platform)
     if not sender:
-        print(f"不支持的平台: {platform}")
+        print(f"Unsupported platform: {platform}")
         return False
 
     if sender(webhook_url, stats):
-        print(f"已发送到 {platform}")
+        print(f"Sent to {platform}")
         return True
     return False

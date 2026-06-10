@@ -7,7 +7,7 @@ import os
 import socket
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from cc_stats.analyzer import (
@@ -221,7 +221,9 @@ def _collect_session_files(project_dir_name=None):
             if gf.parent.parent.name == dir_key:
                 files.append(gf)
     elif project_dir_name:
-        # Claude project
+        # Claude project — guard against path traversal in query parameter
+        if ".." in project_dir_name or "/" in project_dir_name or "\\" in project_dir_name:
+            return []
         claude_projects = Path.home() / ".claude" / "projects"
         proj_dir = claude_projects / project_dir_name
         files = sorted(f for f in proj_dir.glob("*.jsonl") if not f.name.startswith("agent-"))
@@ -362,7 +364,7 @@ def _get_skill_stats(project_dir_name=None, since_days=None):
 
 
 def _get_version_update():
-    """检查版本更新（供 Web API 使用）"""
+    """Check for version updates (used by the Web API)"""
     try:
         from cc_stats.version_checker import check_for_update
         result = check_for_update()
@@ -433,7 +435,7 @@ def find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def start_server() -> tuple[HTTPServer, int]:
+def start_server() -> tuple[ThreadingHTTPServer, int]:
     port = find_free_port()
-    server = HTTPServer(("127.0.0.1", port), ApiHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", port), ApiHandler)
     return server, port

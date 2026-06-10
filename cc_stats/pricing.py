@@ -1,4 +1,4 @@
-"""统一模型定价与匹配逻辑。"""
+"""Unified model pricing and matching logic."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ class Pricing(TypedDict):
     cache_create: float
 
 
-# 价格来源（2026-04-16 校准）：
+# Pricing sources (calibrated 2026-04-16):
 # - OpenAI: https://developers.openai.com/api/docs/pricing
 # - Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
 # - Gemini: https://ai.google.dev/gemini-api/docs/pricing
 #
-# 注：
-# - Gemini 2.5 Pro/Flash 按 <=200k context 档位计算（日志中无法精确区分每次请求是否 >200k）。
-# - OpenAI 暂无“cache write”单独价格字段，cache_create 退化为 input 单价。
+# Notes:
+# - Gemini 2.5 Pro/Flash priced at <=200k context tier (request size not determinable from logs).
+# - OpenAI has no separate “cache write” price; cache_create falls back to input price.
 MODEL_PRICING: dict[str, Pricing] = {
     # Claude
     "claude-opus-4.6": {"input": 5.0, "output": 25.0, "cache_read": 0.50, "cache_create": 6.25},
@@ -31,7 +31,7 @@ MODEL_PRICING: dict[str, Pricing] = {
     "claude-sonnet-4.5": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_create": 3.75},
     "claude-sonnet-4": {"input": 3.0, "output": 15.0, "cache_read": 0.30, "cache_create": 3.75},
     "claude-haiku-4.5": {"input": 1.0, "output": 5.0, "cache_read": 0.10, "cache_create": 1.25},
-    # 兼容旧会话（历史模型）
+    # Legacy model compatibility
     "claude-haiku-legacy": {"input": 0.8, "output": 4.0, "cache_read": 0.08, "cache_create": 1.0},
     # OpenAI (GPT/Codex)
     "gpt-5.4": {"input": 2.50, "output": 15.00, "cache_read": 0.25, "cache_create": 2.50},
@@ -39,7 +39,7 @@ MODEL_PRICING: dict[str, Pricing] = {
     "gpt-5.4-nano": {"input": 0.20, "output": 1.25, "cache_read": 0.020, "cache_create": 0.20},
     "gpt-5.3-codex": {"input": 1.75, "output": 14.00, "cache_read": 0.175, "cache_create": 1.75},
     "gpt-5.3-chat-latest": {"input": 1.75, "output": 14.00, "cache_read": 0.175, "cache_create": 1.75},
-    # 兼容旧会话（历史模型）
+    # Legacy model compatibility
     "gpt-4o": {"input": 2.50, "output": 10.00, "cache_read": 1.25, "cache_create": 2.50},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60, "cache_read": 0.075, "cache_create": 0.15},
     "o1": {"input": 15.00, "output": 60.00, "cache_read": 7.50, "cache_create": 15.00},
@@ -50,13 +50,13 @@ MODEL_PRICING: dict[str, Pricing] = {
     "gemini-2.5-pro": {"input": 1.25, "output": 10.00, "cache_read": 0.125, "cache_create": 1.25},
     "gemini-2.5-flash": {"input": 0.30, "output": 2.50, "cache_read": 0.03, "cache_create": 0.30},
     "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40, "cache_read": 0.01, "cache_create": 0.10},
-    # 兼容旧会话（历史模型）
+    # Legacy model compatibility
     "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "cache_read": 0.025, "cache_create": 0.10},
 }
 
 
 def match_model_pricing(model: str) -> Pricing:
-    """根据模型名匹配单价，未知模型按同厂商主力模型保守回退。"""
+    """Match model pricing by name; unknown models fall back to the primary model for the same vendor."""
     lower = model.lower()
 
     # OpenAI / Codex
@@ -115,7 +115,7 @@ def match_model_pricing(model: str) -> Pricing:
             return MODEL_PRICING["claude-sonnet-4.5"]
         return MODEL_PRICING["claude-sonnet-4"]
 
-    # 厂商回退（防止历史脏数据导致费用完全丢失）
+    # Vendor fallback (prevents historical dirty data from causing missing cost estimates)
     if "gpt" in lower or lower.startswith("o"):
         return MODEL_PRICING["gpt-5.3-codex"]
     if "gemini" in lower:
@@ -129,7 +129,7 @@ def is_claude_model(model: str) -> bool:
 
 
 def estimate_cost_from_token_by_model(token_by_model: dict[str, Any]) -> float:
-    """按 token_by_model 估算总费用。"""
+    """Estimate total cost from token_by_model."""
     total = 0.0
     for model, usage in token_by_model.items():
         p = match_model_pricing(model)

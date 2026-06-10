@@ -1,4 +1,4 @@
-"""Codex 会话解析与发现测试"""
+"""Tests for Codex session parsing and discovery"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def test_parse_codex_jsonl_and_analyze_tokens(tmp_path: Path) -> None:
         {
             "timestamp": "2026-04-16T01:00:01Z",
             "type": "event_msg",
-            "payload": {"type": "user_message", "message": "请看一下"},
+            "payload": {"type": "user_message", "message": "please take a look"},
         },
         {
             "timestamp": "2026-04-16T01:00:02Z",
