@@ -8,34 +8,66 @@
 :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--text3:#6e7681;--cyan:#58a6ff;--purple:#bc8cff;--green:#3fb950;--amber:#f0883e;--red:#f85149;--pink:#f778ba}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
-.app{max-width:900px;margin:0 auto;padding:20px}
+.app{max-width:960px;margin:0 auto;padding:20px}
 .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
 .header h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.controls{display:flex;gap:8px;align-items:center}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---- Checkbox dropdown ---- */
+.proj-dropdown{position:relative}
+.proj-trigger{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;min-width:160px;justify-content:space-between;user-select:none}
+.proj-trigger:hover{border-color:var(--cyan)}
+.proj-trigger .arrow{font-size:9px;color:var(--text3);transition:transform .15s}
+.proj-trigger.open .arrow{transform:rotate(180deg)}
+.proj-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:100;background:var(--card);border:1px solid var(--border);border-radius:8px;min-width:260px;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.proj-panel.open{display:block}
+.proj-panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1}
+.proj-panel-head button{background:none;border:none;color:var(--cyan);font-size:11px;cursor:pointer;padding:2px 4px}
+.proj-panel-head button:hover{color:var(--text)}
+.proj-search{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:4px 8px}
+.proj-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:12px;color:var(--text2)}
+.proj-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.proj-item input[type=checkbox]{accent-color:var(--cyan);cursor:pointer;flex-shrink:0}
+.proj-item .proj-item-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj-item .proj-item-count{font-size:10px;color:var(--text3)}
+
 select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer}
 select:hover{border-color:var(--cyan)}
 .time-btns{display:flex;gap:2px;background:var(--card);border-radius:6px;padding:2px;border:1px solid var(--border)}
 .time-btn{background:none;border:none;color:var(--text2);padding:5px 14px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer}
 .time-btn:hover{color:var(--text);background:rgba(255,255,255,.05)}
 .time-btn.active{background:var(--cyan);color:#fff}
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+
+/* ---- Metrics strip ---- */
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .metric{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;transition:.2s}
 .metric:hover{border-color:rgba(255,255,255,.12);transform:translateY(-1px)}
 .metric-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .metric-value{font-size:26px;font-weight:700;letter-spacing:-1px}
 .metric-sub{font-size:11px;color:var(--text3);margin-top:2px}
-.metric[data-t="msg"] .metric-value{color:var(--cyan)}
-.metric[data-t="tool"] .metric-value{color:var(--purple)}
 .metric[data-t="dur"] .metric-value{color:var(--green)}
 .metric[data-t="cost"] .metric-value{color:var(--amber)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
-.card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px}
-.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.bar-label{font-size:11px;color:var(--text2);width:70px;text-align:right;flex-shrink:0}
-.bar-track{flex:1;height:16px;background:rgba(255,255,255,.03);border-radius:3px;overflow:hidden}
-.bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
-.bar-count{font-size:11px;color:var(--text3);width:30px;text-align:right}
+.metric[data-t="proj"] .metric-value{color:var(--cyan)}
+
+/* ---- Project breakdown table ---- */
+.breakdown-section{margin-bottom:16px}
+.breakdown-section.hidden{display:none}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 10px;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{color:var(--text)}
+th.sorted-asc::after{content:" ▲";color:var(--cyan)}
+th.sorted-desc::after{content:" ▼";color:var(--cyan)}
+td{padding:8px 10px;border-bottom:1px solid rgba(48,54,61,.5);color:var(--text2)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02);color:var(--text)}
+.td-name{font-weight:500;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.td-cost{color:var(--amber);font-weight:600;font-family:monospace}
+.td-lines-add{color:var(--green)}
+.td-lines-del{color:var(--red)}
+.td-tokens{font-family:monospace;color:var(--text3)}
+
+/* ---- Trend ---- */
 .trend{margin-bottom:16px}
 .trend-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
 .trend-bars{display:flex;align-items:flex-end;gap:4px;height:120px}
@@ -43,6 +75,39 @@ select:hover{border-color:var(--cyan)}
 .trend-bar{width:100%;border-radius:3px 3px 0 0;background:linear-gradient(to top,rgba(88,166,255,.6),rgba(188,140,255,.6));transition:height .5s ease;min-height:2px}
 .trend-label{font-size:8px;color:var(--text3)}
 .trend-val{font-size:8px;color:var(--amber);font-weight:500}
+
+/* ---- Token + Skills grid ---- */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px}
+.model-row{padding:8px 0;border-bottom:1px solid var(--border)}
+.model-row:last-child{border:none}
+.model-header{display:flex;justify-content:space-between;margin-bottom:4px}
+.model-name{font-size:11px;font-weight:600;color:var(--text);font-family:monospace}
+.model-cost{font-size:11px;font-weight:700;color:var(--amber);font-family:monospace}
+.model-tokens{font-size:10px;color:var(--text3);font-family:monospace}
+.stacked-bar{height:8px;border-radius:4px;display:flex;overflow:hidden;margin-top:4px}
+.stacked-seg{height:100%;transition:width .5s ease}
+.skill-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.skill-name{font-size:11px;color:var(--text2);width:90px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skill-bar{flex:1;height:16px;background:rgba(255,255,255,.03);border-radius:3px;overflow:hidden}
+.skill-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.skill-count{font-size:11px;color:var(--text3);width:28px;text-align:right}
+.skill-rate{font-size:10px;font-weight:600;width:40px;text-align:right}
+
+/* ---- Details disclosure ---- */
+.details-toggle{display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--border);color:var(--text2);padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:10px}
+.details-toggle:hover{border-color:var(--cyan);color:var(--text)}
+.details-toggle .arr{transition:transform .2s;font-size:10px}
+.details-toggle.open .arr{transform:rotate(90deg)}
+.details-body{display:none;margin-bottom:16px}
+.details-body.open{display:block}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.bar-label{font-size:11px;color:var(--text2);width:70px;text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:16px;background:rgba(255,255,255,.03);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.bar-count{font-size:11px;color:var(--text3);width:30px;text-align:right}
 .ring-section{display:flex;gap:20px;align-items:center}
 .ring-wrap{position:relative;width:100px;height:100px;flex-shrink:0}
 .ring-wrap svg{transform:rotate(-90deg)}
@@ -59,14 +124,21 @@ select:hover{border-color:var(--cyan)}
 .lang-name{font-size:11px;color:var(--text2);flex:1}
 .lang-add{font-size:11px;color:var(--green);font-weight:500}
 .lang-del{font-size:11px;color:var(--red);font-weight:500}
-.model-row{padding:8px 0;border-bottom:1px solid var(--border)}
-.model-row:last-child{border:none}
-.model-header{display:flex;justify-content:space-between;margin-bottom:4px}
-.model-name{font-size:11px;font-weight:600;color:var(--text);font-family:monospace}
-.model-cost{font-size:11px;font-weight:700;color:var(--amber);font-family:monospace}
-.model-tokens{font-size:10px;color:var(--text3);font-family:monospace}
-.stacked-bar{height:8px;border-radius:4px;display:flex;overflow:hidden;margin-top:4px}
-.stacked-seg{height:100%;transition:width .5s ease}
+
+/* ---- Sessions table ---- */
+.sessions-section{margin-bottom:16px}
+.sessions-controls{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.search-input{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;flex:1;min-width:160px}
+.search-input::placeholder{color:var(--text3)}
+.search-input:focus{outline:none;border-color:var(--cyan)}
+.page-info{font-size:12px;color:var(--text3)}
+.page-btns{display:flex;gap:4px}
+.page-btn{background:var(--card);border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:5px;font-size:12px;cursor:pointer}
+.page-btn:hover:not(:disabled){border-color:var(--cyan);color:var(--text)}
+.page-btn:disabled{opacity:.4;cursor:not-allowed}
+.col-hidden{display:none}
+
+/* ---- Cache card ---- */
 .cache-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
 .cache-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;border:1px solid transparent}
 .cache-badge.excellent{color:var(--green);background:rgba(63,185,80,.12);border-color:rgba(63,185,80,.2)}
@@ -91,12 +163,8 @@ select:hover{border-color:var(--cyan)}
 .cache-model-fill{height:100%;border-radius:999px;transition:width .5s ease}
 .cache-model-rate{font-size:10px;color:var(--text);width:36px;text-align:right;font-weight:700;font-family:monospace}
 .cache-empty{font-size:11px;color:var(--text3);padding:4px 0}
-.skill-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.skill-name{font-size:11px;color:var(--text2);width:90px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.skill-bar{flex:1;height:16px;background:rgba(255,255,255,.03);border-radius:3px;overflow:hidden}
-.skill-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
-.skill-count{font-size:11px;color:var(--text3);width:28px;text-align:right}
-.skill-rate{font-size:10px;font-weight:600;width:40px;text-align:right}
+
+/* ---- Misc ---- */
 .info{font-size:11px;color:var(--text3);text-align:center;padding-top:10px}
 .empty{text-align:center;padding:60px 20px;color:var(--text3)}
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-size:13px}
@@ -105,7 +173,7 @@ select:hover{border-color:var(--cyan)}
 .update-banner code{background:rgba(255,255,255,.1);padding:2px 6px;border-radius:4px;font-size:11px}
 .update-banner .dismiss{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1}
 .update-banner .dismiss:hover{color:var(--text)}
-@media(max-width:700px){.metrics{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
+@media(max-width:700px){.metrics{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.grid4{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -117,12 +185,26 @@ select:hover{border-color:var(--cyan)}
   <div class="header">
     <h1>CC Statistics</h1>
     <div class="controls">
-      <select id="project-select"><option value="">All Projects</option></select>
+      <!-- Checkbox dropdown for project selection -->
+      <div class="proj-dropdown" id="proj-dropdown">
+        <div class="proj-trigger" id="proj-trigger" tabindex="0">
+          <span id="proj-label">All Projects</span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="proj-panel" id="proj-panel">
+          <div class="proj-panel-head">
+            <input class="proj-search" id="proj-search" type="text" placeholder="Filter projects…" autocomplete="off">
+            <button onclick="selectAllProjects()">All</button>
+            <button onclick="clearProjects()">Clear</button>
+          </div>
+          <div id="proj-items"></div>
+        </div>
+      </div>
       <select id="source-select">
         <option value="">All Sources</option>
         <option value="claude">Claude Code</option>
-        <option value="codex">Codex</option>
         <option value="gemini">Gemini CLI</option>
+        <option value="codex">Codex</option>
       </select>
       <div class="time-btns">
         <button class="time-btn active" data-days="1">Today</button>
@@ -132,89 +214,315 @@ select:hover{border-color:var(--cyan)}
       </div>
     </div>
   </div>
+
+  <!-- Summary metrics strip: 3 cards -->
   <div class="metrics" id="metrics">
-    <div class="metric" data-t="msg"><div class="metric-label">Instructions</div><div class="metric-value" id="v-msg">—</div><div class="metric-sub" id="s-msg"></div></div>
-    <div class="metric" data-t="tool"><div class="metric-label">Tool Calls</div><div class="metric-value" id="v-tool">—</div><div class="metric-sub" id="s-tool"></div></div>
-    <div class="metric" data-t="dur"><div class="metric-label">Active Time</div><div class="metric-value" id="v-dur">—</div><div class="metric-sub" id="s-dur"></div></div>
-    <div class="metric" data-t="cost"><div class="metric-label">Est. Cost</div><div class="metric-value" id="v-cost">—</div><div class="metric-sub" id="s-cost"></div></div>
+    <div class="metric" data-t="dur">
+      <div class="metric-label">Active Time</div>
+      <div class="metric-value" id="v-dur">—</div>
+      <div class="metric-sub" id="s-dur"></div>
+    </div>
+    <div class="metric" data-t="cost">
+      <div class="metric-label">Est. Cost</div>
+      <div class="metric-value" id="v-cost">—</div>
+      <div class="metric-sub" id="s-cost"></div>
+    </div>
+    <div class="metric" data-t="proj">
+      <div class="metric-label" id="proj-metric-label">Projects</div>
+      <div class="metric-value" id="v-proj">—</div>
+      <div class="metric-sub" id="s-proj"></div>
+    </div>
   </div>
+
+  <!-- Project Breakdown Table (visible only when 2+ projects selected) -->
+  <div class="breakdown-section hidden card" id="breakdown-section" style="margin-bottom:16px">
+    <div class="card-title">Project Breakdown</div>
+    <div class="table-wrap">
+      <table id="breakdown-table">
+        <thead>
+          <tr>
+            <th data-col="display_name" data-type="str">Project</th>
+            <th data-col="sessions" data-type="num">Sessions</th>
+            <th data-col="active_duration" data-type="num">Active Time</th>
+            <th data-col="estimated_cost" data-type="num">Est. Cost</th>
+            <th data-col="lines" data-type="num">Lines +/-</th>
+            <th data-col="total_tokens" data-type="num">Tokens</th>
+          </tr>
+        </thead>
+        <tbody id="breakdown-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Daily Trend Chart -->
   <div class="trend"><div class="trend-card"><div class="card-title">Daily Trend</div><div class="trend-bars" id="trend"></div></div></div>
-  <div class="grid">
-    <div class="card"><div class="card-title">Dev Time</div><div id="time-section" class="ring-section"></div></div>
-    <div class="card"><div class="card-title">Code Changes</div><div id="code-section"></div></div>
+
+  <!-- Token Usage + Skill Usage side by side -->
+  <div class="grid2" id="token-skill-grid">
     <div class="card"><div class="card-title">Token Usage</div><div id="token-section"></div></div>
-    <div class="card"><div class="card-title">Tool Calls</div><div id="tools-section"></div></div>
+    <div class="card" id="skill-card"><div class="card-title">Skill Usage</div><div id="skill-section"></div></div>
   </div>
-  <div class="card" id="cache-card" style="margin-bottom:16px"><div class="card-title">Cache Grade</div><div id="cache-section"></div></div>
-  <div class="card" id="skill-card" style="display:none;margin-bottom:16px"><div class="card-title">Skill Usage</div><div id="skill-section"></div></div>
+
+  <!-- Collapsible Details section -->
+  <button class="details-toggle" id="details-toggle" onclick="toggleDetails()">
+    <span class="arr">&#9658;</span> Details
+  </button>
+  <div class="details-body" id="details-body">
+    <div class="grid4">
+      <div class="card"><div class="card-title">Dev Time</div><div id="time-section" class="ring-section"></div></div>
+      <div class="card"><div class="card-title">Code Changes</div><div id="code-section"></div></div>
+      <div class="card"><div class="card-title">Tool Calls</div><div id="tools-section"></div></div>
+      <div class="card" id="cache-card"><div class="card-title">Cache Grade</div><div id="cache-section"></div></div>
+    </div>
+  </div>
+
+  <!-- Sessions Table -->
+  <div class="sessions-section">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Sessions</div>
+      <div class="sessions-controls">
+        <input class="search-input" id="session-search" type="text" placeholder="Search by date or project…" autocomplete="off">
+        <span class="page-info" id="page-info"></span>
+        <div class="page-btns">
+          <button class="page-btn" id="btn-prev" onclick="changePage(-1)" disabled>&#8249; Prev</button>
+          <button class="page-btn" id="btn-next" onclick="changePage(1)" disabled>Next &#8250;</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="sessions-table">
+          <thead>
+            <tr>
+              <th data-col="date" data-type="str">Date</th>
+              <th data-col="project" data-type="str" id="th-project">Project</th>
+              <th data-col="duration_fmt" data-type="str">Duration</th>
+              <th data-col="estimated_cost" data-type="num">Cost</th>
+              <th data-col="total_tokens" data-type="num">Tokens</th>
+              <th data-col="lines_added" data-type="num">Lines +/-</th>
+            </tr>
+          </thead>
+          <tbody id="sessions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="info" id="info"></div>
 </div>
 <script>
-let currentProject='',currentDays=1,currentSource='',allProjects=[];
+let currentSelectedProjects=new Set(); // Set of dir_name strings; empty = all
+let currentDays=1,currentSource='',allProjects=[];
+let breakdownSortCol='estimated_cost',breakdownSortDir='desc';
+let sessionSortCol='estimated_cost',sessionSortDir='desc';
+let sessionPage=0;
+const PAGE_SIZE=25;
+let allSessions=[]; // full unfiltered session list
+let filteredSessions=[]; // after search filter
 const COLORS=['#58a6ff','#bc8cff','#3fb950','#f0883e','#f85149','#f778ba','#39d2c0','#d29922'];
+
 function fmt(n){if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toLocaleString()}
 function fmtCost(n){return n>=100?'$'+n.toFixed(0):n>=1?'$'+n.toFixed(2):n>=.01?'$'+n.toFixed(3):'$'+n.toFixed(4)}
 function pct(n){return Math.round(n*100)+'%'}
 
+// ---------- API ----------
 async function api(path,params){
   const url=new URL(path,location.origin);
-  if(params)Object.entries(params).forEach(([k,v])=>{if(v!=null&&v!=='')url.searchParams.set(k,v)});
+  if(params)Object.entries(params).forEach(([k,v])=>{
+    if(Array.isArray(v)){v.forEach(vi=>url.searchParams.append(k,vi));}
+    else if(v!=null&&v!=='')url.searchParams.set(k,v);
+  });
   return(await fetch(url)).json();
 }
 
-async function loadProjects(){
-  allProjects=await api('/api/projects');
-  renderProjectSelect();
-}
-function renderProjectSelect(){
-  const sel=document.getElementById('project-select');
-  const filtered=currentSource?allProjects.filter(p=>(p.source||'claude')===currentSource):allProjects;
-  sel.innerHTML='<option value="">All Projects</option>';
-  filtered.forEach(p=>{
-    const o=document.createElement('option');o.value=p.dir_name;
-    const parts=p.display_name.split('/');
-    const tag=p.source==='gemini'?' [G]':'';
-    o.textContent=parts.slice(-1)[0]+tag+' ('+p.session_count+')';
-    sel.appendChild(o);
-  });
+function selectedProjectParam(){
+  if(currentSelectedProjects.size===0)return null;
+  return Array.from(currentSelectedProjects);
 }
 
+// ---------- Project Dropdown ----------
+async function loadProjects(){
+  allProjects=await api('/api/projects');
+  renderProjectItems();
+  updateProjTriggerLabel();
+}
+
+function visibleProjects(){
+  const src=currentSource;
+  return src?allProjects.filter(p=>(p.source||'claude')===src):allProjects;
+}
+
+function renderProjectItems(){
+  const query=(document.getElementById('proj-search').value||'').toLowerCase();
+  const container=document.getElementById('proj-items');
+  const visible=visibleProjects().filter(p=>
+    !query||p.display_name.toLowerCase().includes(query)||p.dir_name.toLowerCase().includes(query)
+  );
+  container.innerHTML=visible.map(p=>{
+    const parts=p.display_name.split('/');
+    const short=parts.slice(-1)[0];
+    const tag=p.source==='gemini'?' [G]':'';
+    const checked=currentSelectedProjects.has(p.dir_name)?'checked':'';
+    return `<label class="proj-item"><input type="checkbox" value="${esc(p.dir_name)}" ${checked} onchange="toggleProject('${esc(p.dir_name)}')">`
+      +`<span class="proj-item-label" title="${esc(p.display_name)}">${esc(short)}${tag}</span>`
+      +`<span class="proj-item-count">${p.session_count}</span></label>`;
+  }).join('');
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function toggleProject(dirName){
+  if(currentSelectedProjects.has(dirName))currentSelectedProjects.delete(dirName);
+  else currentSelectedProjects.add(dirName);
+  updateProjTriggerLabel();
+  loadStats();
+}
+
+function updateProjTriggerLabel(){
+  const el=document.getElementById('proj-label');
+  const n=currentSelectedProjects.size;
+  const visible=visibleProjects();
+  if(n===0){el.textContent='All Projects';}
+  else if(n===1){
+    const name=Array.from(currentSelectedProjects)[0];
+    const proj=allProjects.find(p=>p.dir_name===name);
+    const display=proj?proj.display_name.split('/').slice(-1)[0]:name;
+    el.textContent=display.length>22?display.slice(0,20)+'…':display;
+  } else if(n===visible.length){el.textContent='All Projects';}
+  else{el.textContent=n+' projects selected';}
+}
+
+function selectAllProjects(){
+  const visible=visibleProjects();
+  visible.forEach(p=>currentSelectedProjects.add(p.dir_name));
+  // treat "all selected" same as "none selected" semantically (no project filter)
+  if(currentSelectedProjects.size===visibleProjects().length){currentSelectedProjects.clear();}
+  renderProjectItems();
+  updateProjTriggerLabel();
+  loadStats();
+}
+
+function clearProjects(){
+  currentSelectedProjects.clear();
+  renderProjectItems();
+  updateProjTriggerLabel();
+  loadStats();
+}
+
+// Toggle panel open/close
+document.getElementById('proj-trigger').addEventListener('click',()=>{
+  const panel=document.getElementById('proj-panel');
+  const trigger=document.getElementById('proj-trigger');
+  const open=panel.classList.toggle('open');
+  trigger.classList.toggle('open',open);
+});
+// Close when clicking outside
+document.addEventListener('click',e=>{
+  if(!document.getElementById('proj-dropdown').contains(e.target)){
+    document.getElementById('proj-panel').classList.remove('open');
+    document.getElementById('proj-trigger').classList.remove('open');
+  }
+});
+document.getElementById('proj-search').addEventListener('input',renderProjectItems);
+
+// ---------- Load stats ----------
 async function loadStats(){
   const days=currentDays>0?currentDays:null;
+  const projParam=selectedProjectParam();
   const [stats,daily,skills]=await Promise.all([
-    api('/api/stats',{project:currentProject||null,days}),
-    api('/api/daily_stats',{project:currentProject||null,days:currentDays>0?currentDays:30}),
-    api('/api/skills',{project:currentProject||null,days}),
+    api('/api/stats',{project:projParam,days}),
+    api('/api/daily_stats',{project:projParam,days:currentDays>0?currentDays:30}),
+    api('/api/skills',{project:projParam,days}),
   ]);
   if(stats.error){document.getElementById('info').textContent=stats.error;return;}
-  updateMetrics(stats);
+  updateMetrics(stats,projParam);
+  updateBreakdown(stats);
   updateTrend(daily);
+  updateTokens(stats);
+  updateSkills(skills);
   updateTime(stats);
   updateCode(stats);
-  updateTokens(stats);
   updateCache(stats);
   updateTools(stats);
-  updateSkills(skills);
+  allSessions=stats.session_list||[];
+  sessionPage=0;
+  applySessionFilter();
   const info=document.getElementById('info');
   info.textContent=stats.session_count+' sessions analyzed';
 }
 
-function updateMetrics(d){
-  document.getElementById('v-msg').textContent=fmt(d.user_message_count);
-  document.getElementById('s-msg').textContent=d.turn_count+' turns';
-  document.getElementById('v-tool').textContent=fmt(d.tool_call_total);
-  document.getElementById('s-tool').textContent=d.tool_calls.length>0?'Top: '+d.tool_calls[0].name:'';
+// ---------- Metrics ----------
+function updateMetrics(d,projParam){
+  const sel=currentSelectedProjects.size;
+  const isSingle=sel===1;
+
   document.getElementById('v-dur').textContent=d.active_duration_fmt;
   const aiPct=d.active_duration>0?Math.round(d.ai_duration/d.active_duration*100):0;
-  document.getElementById('s-dur').textContent='AI '+aiPct+'% | Total '+d.total_duration_fmt;
+  document.getElementById('s-dur').textContent='AI '+aiPct+'% of active';
+
   document.getElementById('v-cost').textContent=fmtCost(d.estimated_cost);
   document.getElementById('s-cost').textContent=fmt(d.token_usage.total)+' tokens';
+
+  if(isSingle){
+    document.getElementById('proj-metric-label').textContent='Sessions';
+    document.getElementById('v-proj').textContent=d.session_count;
+    const avgCost=d.session_count>0?d.estimated_cost/d.session_count:0;
+    document.getElementById('s-proj').textContent='avg '+fmtCost(avgCost)+'/session';
+  } else {
+    const projCount=(d.project_breakdown||[]).length||'—';
+    document.getElementById('proj-metric-label').textContent='Projects';
+    document.getElementById('v-proj').textContent=projCount;
+    document.getElementById('s-proj').textContent=d.session_count+' total sessions';
+  }
 }
 
+// ---------- Project Breakdown ----------
+let breakdownData=[];
+function updateBreakdown(d){
+  const rows=d.project_breakdown||[];
+  const isSingle=currentSelectedProjects.size===1;
+  const section=document.getElementById('breakdown-section');
+  if(isSingle||rows.length<2){section.classList.add('hidden');return;}
+  section.classList.remove('hidden');
+  breakdownData=rows;
+  renderBreakdown();
+}
+
+function renderBreakdown(){
+  const tbody=document.getElementById('breakdown-tbody');
+  const sorted=[...breakdownData].sort((a,b)=>{
+    const av=breakdownSortCol==='lines'?(a.lines_added-a.lines_removed):a[breakdownSortCol];
+    const bv=breakdownSortCol==='lines'?(b.lines_added-b.lines_removed):b[breakdownSortCol];
+    const cmp=typeof av==='string'?av.localeCompare(bv):((av||0)-(bv||0));
+    return breakdownSortDir==='desc'?-cmp:cmp;
+  });
+  tbody.innerHTML=sorted.map(r=>{
+    const net=r.lines_added-r.lines_removed;
+    return `<tr>`
+      +`<td class="td-name" title="${esc(r.display_name)}">${esc(r.display_name)}</td>`
+      +`<td>${r.sessions}</td>`
+      +`<td>${r.active_duration_fmt}</td>`
+      +`<td class="td-cost">${fmtCost(r.estimated_cost)}</td>`
+      +`<td><span class="td-lines-add">+${fmt(r.lines_added)}</span> <span class="td-lines-del">-${fmt(r.lines_removed)}</span></td>`
+      +`<td class="td-tokens">${fmt(r.total_tokens)}</td>`
+      +`</tr>`;
+  }).join('');
+  // Update header sort indicators
+  document.querySelectorAll('#breakdown-table th').forEach(th=>{
+    th.classList.remove('sorted-asc','sorted-desc');
+    if(th.dataset.col===breakdownSortCol)th.classList.add('sorted-'+breakdownSortDir);
+  });
+}
+
+document.querySelectorAll('#breakdown-table th').forEach(th=>{
+  th.addEventListener('click',()=>{
+    if(th.dataset.col===breakdownSortCol)breakdownSortDir=breakdownSortDir==='desc'?'asc':'desc';
+    else{breakdownSortCol=th.dataset.col;breakdownSortDir='desc';}
+    renderBreakdown();
+  });
+});
+
+// ---------- Trend ----------
 function updateTrend(daily){
   const el=document.getElementById('trend');
-  const data=daily.filter(d=>d.cost>0||d.sessions>0);
-  if(!data.length){el.innerHTML='<div class="empty">No data</div>';return;}
   const max=Math.max(...daily.map(d=>d.cost),1);
   el.innerHTML=daily.map(d=>{
     const h=Math.max(2,d.cost/max*100);
@@ -223,12 +531,47 @@ function updateTrend(daily){
   }).join('');
 }
 
+// ---------- Token Usage ----------
+function updateTokens(d){
+  const el=document.getElementById('token-section');
+  let html='';
+  d.token_by_model.forEach(m=>{
+    const total=m.total||1;
+    html+='<div class="model-row"><div class="model-header"><span class="model-name">'+m.model+'</span><span class="model-cost">'+fmtCost(m.cost)+'</span><span class="model-tokens">'+fmt(m.total)+'</span></div>'
+      +'<div class="stacked-bar"><div class="stacked-seg" style="width:'+Math.round(m.input_tokens/total*100)+'%;background:var(--cyan)"></div><div class="stacked-seg" style="width:'+Math.round(m.output_tokens/total*100)+'%;background:var(--purple)"></div><div class="stacked-seg" style="width:'+Math.round(m.cache_read/total*100)+'%;background:var(--green)"></div><div class="stacked-seg" style="width:'+Math.round(m.cache_creation/total*100)+'%;background:var(--amber)"></div></div></div>';
+  });
+  html+='<div style="display:flex;gap:12px;margin-top:8px;font-size:10px"><span style="color:var(--cyan)">In: '+fmt(d.token_usage.input_tokens)+'</span><span style="color:var(--purple)">Out: '+fmt(d.token_usage.output_tokens)+'</span><span style="color:var(--green)">Cache: '+fmt(d.token_usage.cache_read+d.token_usage.cache_creation)+'</span><span style="color:var(--amber);font-weight:700">'+fmtCost(d.estimated_cost)+'</span></div>';
+  el.innerHTML=html;
+}
+
+// ---------- Skill Usage ----------
+function updateSkills(skills){
+  const card=document.getElementById('skill-card');
+  const el=document.getElementById('skill-section');
+  if(!skills||!skills.length){el.innerHTML='<div style="color:var(--text3);font-size:11px">No skill data</div>';return;}
+  const max=skills[0].call_count||1;
+  el.innerHTML=skills.slice(0,10).map((s,i)=>{
+    const p=Math.round(s.call_count/max*100);
+    const rateColor=s.success_rate==null?'var(--text3)':s.success_rate>=90?'var(--green)':s.success_rate>=70?'var(--amber)':'var(--red)';
+    const rateText=s.success_rate!=null?s.success_rate+'%':'—';
+    return '<div class="skill-row"><div class="skill-name" title="'+s.name+'">'+s.name+'</div><div class="skill-bar"><div class="skill-bar-fill" style="width:'+p+'%;background:'+COLORS[i%8]+'80"></div></div><div class="skill-count">'+s.call_count+'</div><div class="skill-rate" style="color:'+rateColor+'">'+rateText+'</div></div>';
+  }).join('');
+}
+
+// ---------- Details section ----------
+function toggleDetails(){
+  const btn=document.getElementById('details-toggle');
+  const body=document.getElementById('details-body');
+  const open=body.classList.toggle('open');
+  btn.classList.toggle('open',open);
+}
+
 function updateTime(d){
   const active=d.ai_duration+d.user_duration;
-  const pct=active>0?Math.round(d.ai_duration/active*100):0;
-  const r=40,c=2*Math.PI*r,off=c*(1-pct/100);
+  const p=active>0?Math.round(d.ai_duration/active*100):0;
+  const r=40,c=2*Math.PI*r,off=c*(1-p/100);
   document.getElementById('time-section').innerHTML=
-    '<div class="ring-wrap"><svg width="100" height="100"><circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--border)" stroke-width="8"/><circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--cyan)" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'"/></svg><div class="ring-center"><div class="ring-pct">'+pct+'%</div><div class="ring-lbl">AI</div></div></div>'
+    '<div class="ring-wrap"><svg width="100" height="100"><circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--border)" stroke-width="8"/><circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--cyan)" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'"/></svg><div class="ring-center"><div class="ring-pct">'+p+'%</div><div class="ring-lbl">AI</div></div></div>'
     +'<div class="time-rows"><div class="time-row"><span class="label">Total</span><span class="value">'+d.total_duration_fmt+'</span></div><div class="time-row"><span class="label">AI</span><span class="value">'+d.ai_duration_fmt+'</span></div><div class="time-row"><span class="label">User</span><span class="value">'+d.user_duration_fmt+'</span></div></div>';
 }
 
@@ -245,16 +588,11 @@ function updateCode(d){
   el.innerHTML=html;
 }
 
-function updateTokens(d){
-  const el=document.getElementById('token-section');
-  let html='';
-  d.token_by_model.forEach(m=>{
-    const total=m.total||1;
-    html+='<div class="model-row"><div class="model-header"><span class="model-name">'+m.model+'</span><span class="model-cost">'+fmtCost(m.cost)+'</span><span class="model-tokens">'+fmt(m.total)+'</span></div>'
-      +'<div class="stacked-bar"><div class="stacked-seg" style="width:'+Math.round(m.input_tokens/total*100)+'%;background:var(--cyan)"></div><div class="stacked-seg" style="width:'+Math.round(m.output_tokens/total*100)+'%;background:var(--purple)"></div><div class="stacked-seg" style="width:'+Math.round(m.cache_read/total*100)+'%;background:var(--green)"></div><div class="stacked-seg" style="width:'+Math.round(m.cache_creation/total*100)+'%;background:var(--amber)"></div></div></div>';
-  });
-  html+='<div style="display:flex;gap:12px;margin-top:8px;font-size:10px"><span style="color:var(--cyan)">In: '+fmt(d.token_usage.input_tokens)+'</span><span style="color:var(--purple)">Out: '+fmt(d.token_usage.output_tokens)+'</span><span style="color:var(--green)">Cache: '+fmt(d.token_usage.cache_read+d.token_usage.cache_creation)+'</span><span style="color:var(--amber);font-weight:700">'+fmtCost(d.estimated_cost)+'</span></div>';
-  el.innerHTML=html;
+function updateTools(d){
+  const el=document.getElementById('tools-section');
+  const items=d.tool_calls.slice(0,10);
+  const max=items[0]?.count||1;
+  el.innerHTML=items.map((t,i)=>'<div class="bar-row"><div class="bar-label">'+t.name+'</div><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(t.count/max*100)+'%;background:'+COLORS[i%8]+'80"></div></div><div class="bar-count">'+t.count+'</div></div>').join('');
 }
 
 function updateCache(d){
@@ -280,36 +618,93 @@ function updateCache(d){
   el.innerHTML=html;
 }
 
-function updateTools(d){
-  const el=document.getElementById('tools-section');
-  const items=d.tool_calls.slice(0,10);
-  const max=items[0]?.count||1;
-  el.innerHTML=items.map((t,i)=>'<div class="bar-row"><div class="bar-label">'+t.name+'</div><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(t.count/max*100)+'%;background:'+COLORS[i%8]+'80"></div></div><div class="bar-count">'+t.count+'</div></div>').join('');
+// ---------- Sessions Table ----------
+document.getElementById('session-search').addEventListener('input',()=>{sessionPage=0;applySessionFilter();});
+
+// Sort on header click
+document.querySelectorAll('#sessions-table th').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const col=th.dataset.col;
+    if(!col)return;
+    if(col===sessionSortCol)sessionSortDir=sessionSortDir==='desc'?'asc':'desc';
+    else{sessionSortCol=col;sessionSortDir='desc';}
+    sessionPage=0;
+    applySessionFilter();
+  });
+});
+
+function applySessionFilter(){
+  const q=(document.getElementById('session-search').value||'').toLowerCase();
+  filteredSessions=allSessions.filter(s=>
+    !q||s.date.toLowerCase().includes(q)||(s.project||'').toLowerCase().includes(q)
+  );
+  renderSessionsTable();
 }
 
-function updateSkills(skills){
-  const card=document.getElementById('skill-card');
-  const el=document.getElementById('skill-section');
-  if(!skills||!skills.length){card.style.display='none';return;}
-  card.style.display='';
-  const max=skills[0].call_count||1;
-  el.innerHTML=skills.slice(0,10).map((s,i)=>{
-    const pct=Math.round(s.call_count/max*100);
-    const rateColor=s.success_rate==null?'var(--text3)':s.success_rate>=90?'var(--green)':s.success_rate>=70?'var(--amber)':'var(--red)';
-    const rateText=s.success_rate!=null?s.success_rate+'%':'—';
-    return '<div class="skill-row"><div class="skill-name" title="'+s.name+'">'+s.name+'</div><div class="skill-bar"><div class="skill-bar-fill" style="width:'+pct+'%;background:'+COLORS[i%8]+'80"></div></div><div class="skill-count">'+s.call_count+'</div><div class="skill-rate" style="color:'+rateColor+'">'+rateText+'</div></div>';
+function renderSessionsTable(){
+  const isSingle=currentSelectedProjects.size===1;
+  const thProj=document.getElementById('th-project');
+  thProj.classList.toggle('col-hidden',isSingle);
+
+  // Sort
+  const sorted=[...filteredSessions].sort((a,b)=>{
+    let av=a[sessionSortCol],bv=b[sessionSortCol];
+    if(typeof av==='string')return sessionSortDir==='desc'?bv.localeCompare(av):av.localeCompare(bv);
+    return sessionSortDir==='desc'?((bv||0)-(av||0)):((av||0)-(bv||0));
+  });
+
+  const total=sorted.length;
+  const pageCount=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  if(sessionPage>=pageCount)sessionPage=pageCount-1;
+  const slice=sorted.slice(sessionPage*PAGE_SIZE,(sessionPage+1)*PAGE_SIZE);
+
+  document.getElementById('page-info').textContent=total>0?`${sessionPage*PAGE_SIZE+1}–${Math.min((sessionPage+1)*PAGE_SIZE,total)} of ${total}`:'0 sessions';
+  document.getElementById('btn-prev').disabled=sessionPage===0;
+  document.getElementById('btn-next').disabled=sessionPage>=pageCount-1;
+
+  // Update sort indicators
+  document.querySelectorAll('#sessions-table th').forEach(th=>{
+    th.classList.remove('sorted-asc','sorted-desc');
+    if(th.dataset.col===sessionSortCol)th.classList.add('sorted-'+sessionSortDir);
+  });
+
+  const tbody=document.getElementById('sessions-tbody');
+  tbody.innerHTML=slice.map(s=>{
+    const projCell=isSingle
+      ?`<td class="col-hidden"></td>`
+      :`<td class="td-name" title="${esc(s.project_path||s.project||'')}">${esc(s.project||'')}</td>`;
+    return `<tr>`
+      +`<td style="white-space:nowrap;color:var(--text3)">${esc(s.date)}</td>`
+      +projCell
+      +`<td>${esc(s.duration_fmt)}</td>`
+      +`<td class="td-cost">${fmtCost(s.estimated_cost)}</td>`
+      +`<td class="td-tokens">${fmt(s.total_tokens)}</td>`
+      +`<td><span class="td-lines-add">+${fmt(s.lines_added)}</span> <span class="td-lines-del">-${fmt(s.lines_removed)}</span></td>`
+      +`</tr>`;
   }).join('');
 }
 
-document.getElementById('project-select').addEventListener('change',e=>{currentProject=e.target.value;loadStats()});
+function changePage(delta){
+  sessionPage+=delta;
+  renderSessionsTable();
+}
+
+// ---------- Source filter ----------
 document.getElementById('source-select').addEventListener('change',e=>{
-  currentSource=e.target.value;currentProject='';renderProjectSelect();loadStats();
+  currentSource=e.target.value;
+  currentSelectedProjects.clear();
+  renderProjectItems();
+  updateProjTriggerLabel();
+  loadStats();
 });
+
+// ---------- Time filter ----------
 document.querySelectorAll('.time-btn').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.time-btn').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');currentDays=parseInt(b.dataset.days);loadStats();
 }));
 
+// ---------- Update banner ----------
 function dismissUpdate(){document.getElementById('update-banner').classList.remove('show');sessionStorage.setItem('update-dismissed','1')}
 async function checkVersion(){
   if(sessionStorage.getItem('update-dismissed'))return;
@@ -321,6 +716,7 @@ async function checkVersion(){
     }
   }catch(e){}
 }
+
 loadProjects();loadStats();checkVersion();setInterval(checkVersion,4*3600*1000);
 </script>
 </body>

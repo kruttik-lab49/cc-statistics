@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import socket
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +27,46 @@ from cc_stats.parser import (
 )
 
 _web_dir = os.path.join(os.path.dirname(__file__), "web")
+
+# --- Session stats cache ---
+# Key: (file_path_str, mtime_ns) → SessionStats
+# Past session files are immutable; only the active session changes.
+# This makes cache hits essentially free (dict lookup) for all completed sessions.
+_session_cache: dict[tuple[str, int], object] = {}
+_session_cache_lock = threading.Lock()
+
+
+def _get_cached_session_stats(f):
+    """Parse and analyze a session file, returning cached result if mtime unchanged."""
+    mtime = f.stat().st_mtime_ns
+    key = (str(f), mtime)
+    with _session_cache_lock:
+        if key in _session_cache:
+            return _session_cache[key]
+    session = _parse_session_file(f)
+    stats = analyze_session(session)
+    with _session_cache_lock:
+        _session_cache[key] = (session, stats)
+    return session, stats
+
+
+# --- Project list cache ---
+# Short TTL (10 s) — new projects appear when a new session starts, which is rare.
+_projects_cache: dict = {"data": None, "ts": 0.0}
+_projects_cache_lock = threading.Lock()
+_PROJECTS_CACHE_TTL = 10.0
+
+
+def _get_projects_cached():
+    with _projects_cache_lock:
+        if _projects_cache["data"] is not None and (time.monotonic() - _projects_cache["ts"]) < _PROJECTS_CACHE_TTL:
+            return _projects_cache["data"]
+    data = _get_projects()
+    with _projects_cache_lock:
+        _projects_cache["data"] = data
+        _projects_cache["ts"] = time.monotonic()
+    return data
+
 
 # Model pricing ($/M tokens)
 _PRICING = {
@@ -64,7 +106,8 @@ def _estimate_cost(tu: TokenUsage, model: str = "") -> float:
     return cost
 
 
-def _resolve_project_name(proj_dir, jsonl_files):
+def _resolve_project_cwd(proj_dir, jsonl_files) -> str:
+    """Return the cwd path from the first JSONL line that has one, else ''."""
     for jf in jsonl_files:
         try:
             with open(jf, encoding="utf-8") as fh:
@@ -77,7 +120,31 @@ def _resolve_project_name(proj_dir, jsonl_files):
                         continue
         except OSError:
             continue
-    return proj_dir.name
+    return ""
+
+
+def _canonical_project_root(cwd: str) -> str:
+    """Strip /.claude/worktrees/<name> suffix to get the real project root.
+    A worktree cwd looks like /path/to/project/.claude/worktrees/branch-name.
+    We want /path/to/project so that worktrees group with their parent project."""
+    from pathlib import PurePosixPath
+    p = PurePosixPath(cwd)
+    parts = p.parts
+    try:
+        idx = parts.index(".claude")
+        if idx > 0 and len(parts) > idx + 1 and parts[idx + 1] == "worktrees":
+            return str(PurePosixPath(*parts[:idx]))
+    except ValueError:
+        pass
+    return cwd
+
+
+def _display_name_from_path(path: str) -> str:
+    """Return the last path component as the human-readable project name."""
+    from pathlib import PurePosixPath
+    if not path:
+        return ""
+    return PurePosixPath(path).name
 
 
 def _stats_to_dict(stats: SessionStats, session_count: int = 1) -> dict:
@@ -88,9 +155,12 @@ def _stats_to_dict(stats: SessionStats, session_count: int = 1) -> dict:
         total = int(td.total_seconds())
         if total < 0:
             return "0s"
-        h, rem = divmod(total, 3600)
+        d, rem = divmod(total, 86400)
+        h, rem = divmod(rem, 3600)
         m, s = divmod(rem, 60)
         parts = []
+        if d:
+            parts.append(f"{d}d")
         if h:
             parts.append(f"{h}h")
         if m:
@@ -165,20 +235,39 @@ def _get_projects():
     from pathlib import Path
     projects = []
 
-    # Claude projects
+    # Claude projects — group worktrees with their parent project by canonical root
     claude_projects = Path.home() / ".claude" / "projects"
     if claude_projects.exists():
+        # canonical_root → {dir_names, display_name, cwd, session_count}
+        root_to_group: dict[str, dict] = {}
         for proj in sorted(claude_projects.iterdir()):
             if not proj.is_dir():
                 continue
             jsonl_files = [f for f in proj.glob("*.jsonl") if not f.name.startswith("agent-")]
             if not jsonl_files:
                 continue
-            display_name = _resolve_project_name(proj, jsonl_files)
+            cwd = _resolve_project_cwd(proj, jsonl_files)
+            root = _canonical_project_root(cwd) if cwd else ""
+            name = _display_name_from_path(root) if root else proj.name
+            key = root or proj.name
+            if key in root_to_group:
+                root_to_group[key]["dir_names"].append(proj.name)
+                root_to_group[key]["session_count"] += len(jsonl_files)
+            else:
+                root_to_group[key] = {
+                    "dir_names": [proj.name],
+                    "display_name": name,
+                    "cwd": root,
+                    "session_count": len(jsonl_files),
+                }
+        for key, g in root_to_group.items():
             projects.append({
-                "dir_name": proj.name,
-                "display_name": display_name,
-                "session_count": len(jsonl_files),
+                # dir_name is the primary folder; dir_names covers all grouped folders
+                "dir_name": g["dir_names"][0],
+                "dir_names": g["dir_names"],
+                "display_name": g["display_name"],
+                "cwd": g["cwd"],
+                "session_count": g["session_count"],
                 "source": "claude",
             })
 
@@ -242,25 +331,115 @@ def _parse_session_file(f):
     return parse_jsonl(f)
 
 
-def _get_stats(project_dir_name=None, since_days=None):
-    files = _collect_session_files(project_dir_name)
-    if not files:
-        return {"error": "No sessions found"}
+def _fmt_duration_td(td) -> str:
+    """Format a timedelta as a human-readable duration string."""
+    total = int(td.total_seconds())
+    if total < 0:
+        return "0s"
+    d, rem = divmod(total, 86400)
+    h, rem = divmod(rem, 3600)
+    m, s = divmod(rem, 60)
+    parts = []
+    if d:
+        parts.append(f"{d}d")
+    if h:
+        parts.append(f"{h}h")
+    if m:
+        parts.append(f"{m}m")
+    if s or not parts:
+        parts.append(f"{s}s")
+    return " ".join(parts)
 
-    files.sort(key=lambda f: f.stat().st_mtime)
+
+def _get_stats(project_dir_name=None, since_days=None, project_dir_names=None):
+    """Get aggregated stats. Supports single project_dir_name or a list via project_dir_names."""
+    names = project_dir_names or ([project_dir_name] if project_dir_name else [None])
 
     since_dt = None
     if since_days:
         since_dt = datetime.now(tz=timezone.utc) - timedelta(days=since_days)
 
-    all_stats = []
+    all_known = _get_projects_cached()
+    # dir_name → project metadata (one entry per physical folder, including worktrees)
+    dir_meta: dict[str, dict] = {}
+    for p in all_known:
+        for dn in p.get("dir_names", [p["dir_name"]]):
+            dir_meta[dn] = p  # all dir_names in a group point to same metadata
+
+    per_project_stats: dict[str, list] = defaultdict(list)
+
+    all_files = []
+    # Map file path → canonical project key (= cwd root path, or dir_name for Gemini).
+    # Grouping by canonical root collapses worktree folders with their parent project.
+    file_to_project: dict[str, str] = {}
+    # Also keep file → metadata for session_list display name / tooltip
+    file_to_meta: dict[str, dict] = {}
+
+    for name in names:
+        project_files = _collect_session_files(name)
+        for f in project_files:
+            fkey = str(f)
+            if fkey in file_to_project:
+                continue
+            if name:
+                meta = dir_meta.get(name, {})
+                canonical = meta.get("cwd") or name
+            else:
+                # No filter — derive from path
+                if f.suffix == ".json":
+                    # Gemini: use dir_name key
+                    canonical = f.parent.parent.name
+                    meta = dir_meta.get(canonical, {})
+                else:
+                    dir_name = f.parent.name
+                    meta = dir_meta.get(dir_name, {})
+                    canonical = meta.get("cwd") or dir_name
+            file_to_project[fkey] = canonical
+            file_to_meta[fkey] = meta
+        all_files.extend(project_files)
+
+    # Deduplicate files by path
+    seen: set[str] = set()
+    files = []
+    for f in all_files:
+        fkey = str(f)
+        if fkey not in seen:
+            seen.add(fkey)
+            files.append(f)
+
+    if not files:
+        return {"error": "No sessions found"}
+
+    files.sort(key=lambda f: f.stat().st_mtime)
+
+    all_stats = []   # active sessions only (tokens > 0) — used for aggregation
+    session_list = []
     for f in files:
         try:
-            session = _parse_session_file(f)
-            stats = analyze_session(session)
+            session, stats = _get_cached_session_stats(f)
             if since_dt and stats.end_time and stats.end_time < since_dt:
                 continue
+            # Skip sessions with no timestamp or no tokens — treat as inactive
+            if not stats.start_time or stats.token_usage.total == 0:
+                continue
             all_stats.append(stats)
+
+            proj_key = file_to_project.get(str(f), "")
+            per_project_stats[proj_key].append(stats)
+
+            meta = file_to_meta.get(str(f), {})
+            display = meta.get("display_name") or _display_name_from_path(proj_key) or proj_key
+            cost = sum(_estimate_cost(u, m) for m, u in stats.token_by_model.items())
+            session_list.append({
+                "date": stats.start_time.astimezone().strftime("%Y-%m-%d %H:%M"),
+                "project": display,
+                "project_path": meta.get("cwd") or proj_key,
+                "duration_fmt": _fmt_duration_td(stats.active_duration),
+                "estimated_cost": round(cost, 4),
+                "total_tokens": stats.token_usage.total,
+                "lines_added": stats.total_added,
+                "lines_removed": stats.total_removed,
+            })
         except Exception:
             continue
 
@@ -268,19 +447,55 @@ def _get_stats(project_dir_name=None, since_days=None):
         return {"error": "No valid sessions"}
 
     result = all_stats[0] if len(all_stats) == 1 else merge_stats(all_stats)
-    return _stats_to_dict(result, session_count=len(all_stats))
+    d = _stats_to_dict(result, session_count=len(all_stats))
+
+    session_list.sort(key=lambda x: x["estimated_cost"], reverse=True)
+    d["session_list"] = session_list
+
+    # Build project breakdown — one row per canonical root
+    breakdown = []
+    for proj_key, proj_stats in per_project_stats.items():
+        if not proj_stats:
+            continue
+        merged = proj_stats[0] if len(proj_stats) == 1 else merge_stats(proj_stats)
+        proj_cost = sum(_estimate_cost(u, m) for m, u in merged.token_by_model.items())
+        display = _display_name_from_path(proj_key) or proj_key
+        breakdown.append({
+            "dir_name": proj_key,
+            "display_name": display,
+            "sessions": len(proj_stats),
+            "active_duration_fmt": _fmt_duration_td(merged.active_duration),
+            "active_duration": merged.active_duration.total_seconds(),
+            "estimated_cost": round(proj_cost, 4),
+            "total_tokens": merged.token_usage.total,
+            "lines_added": merged.total_added,
+            "lines_removed": merged.total_removed,
+        })
+    breakdown.sort(key=lambda x: x["estimated_cost"], reverse=True)
+    d["project_breakdown"] = breakdown
+
+    return d
 
 
-def _get_daily_stats(project_dir_name=None, days=14):
-    files = _collect_session_files(project_dir_name)
+def _get_daily_stats(project_dir_name=None, days=14, project_dir_names=None):
+    names = project_dir_names or ([project_dir_name] if project_dir_name else [None])
+    all_files = []
+    for name in names:
+        all_files.extend(_collect_session_files(name))
+    seen = set()
+    files = []
+    for f in all_files:
+        key = str(f)
+        if key not in seen:
+            seen.add(key)
+            files.append(f)
 
     since_dt = datetime.now(tz=timezone.utc) - timedelta(days=days)
     daily: dict[str, list] = defaultdict(list)
 
     for f in files:
         try:
-            session = _parse_session_file(f)
-            stats = analyze_session(session)
+            _, stats = _get_cached_session_stats(f)
             if stats.end_time and stats.end_time < since_dt:
                 continue
             if not stats.start_time:
@@ -318,13 +533,23 @@ def _get_daily_stats(project_dir_name=None, days=14):
     return result
 
 
-def _get_skill_stats(project_dir_name=None, since_days=None):
+def _get_skill_stats(project_dir_name=None, since_days=None, project_dir_names=None):
     """Return skill usage statistics as a list sorted by call_count.
 
     Skill stats always cover ALL sessions (ignoring since_days) because
     skill usage patterns are more meaningful at the all-time level.
     """
-    files = _collect_session_files(project_dir_name)
+    names = project_dir_names or ([project_dir_name] if project_dir_name else [None])
+    all_files = []
+    for name in names:
+        all_files.extend(_collect_session_files(name))
+    seen = set()
+    files = []
+    for f in all_files:
+        key = str(f)
+        if key not in seen:
+            seen.add(key)
+            files.append(f)
     if not files:
         return []
 
@@ -333,8 +558,7 @@ def _get_skill_stats(project_dir_name=None, since_days=None):
     all_stats = []
     for f in files:
         try:
-            session = _parse_session_file(f)
-            stats = analyze_session(session)
+            _, stats = _get_cached_session_stats(f)
             all_stats.append(stats)
         except Exception:
             continue
@@ -384,33 +608,63 @@ class ApiHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=_web_dir, **kwargs)
 
+    @staticmethod
+    def _parse_projects(params) -> tuple[list[str] | None, str | None]:
+        """Parse ?project= param(s).
+
+        Supports:
+          - single:   ?project=foo
+          - repeated: ?project=foo&project=bar
+          - comma-separated: ?project=foo,bar
+
+        Returns (project_dir_names, single_project_dir_name):
+          - If no project param → (None, None)  → all projects
+          - If 1 project       → (None, "foo")  → single project path
+          - If 2+              → (["foo","bar"], None)
+        """
+        raw = params.get("project", [])
+        names: list[str] = []
+        for val in raw:
+            for part in val.split(","):
+                part = part.strip()
+                if part:
+                    names.append(part)
+        if not names:
+            return None, None
+        if len(names) == 1:
+            return None, names[0]
+        return names, None
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
         params = parse_qs(parsed.query)
 
         if path == "/api/projects":
-            self._json(_get_projects())
+            self._json(_get_projects_cached())
         elif path == "/api/stats":
-            project = params.get("project", [None])[0]
+            project_dir_names, project = self._parse_projects(params)
             days = params.get("days", [None])[0]
             self._json(_get_stats(
-                project_dir_name=project or None,
+                project_dir_name=project,
                 since_days=int(days) if days and days != "0" else None,
+                project_dir_names=project_dir_names,
             ))
         elif path == "/api/daily_stats":
-            project = params.get("project", [None])[0]
+            project_dir_names, project = self._parse_projects(params)
             days = params.get("days", ["14"])[0]
             self._json(_get_daily_stats(
-                project_dir_name=project or None,
+                project_dir_name=project,
                 days=int(days),
+                project_dir_names=project_dir_names,
             ))
         elif path == "/api/skills":
-            project = params.get("project", [None])[0]
+            project_dir_names, project = self._parse_projects(params)
             days = params.get("days", [None])[0]
             self._json(_get_skill_stats(
-                project_dir_name=project or None,
+                project_dir_name=project,
                 since_days=int(days) if days and days != "0" else None,
+                project_dir_names=project_dir_names,
             ))
         elif path == "/api/version_check":
             self._json(_get_version_update())

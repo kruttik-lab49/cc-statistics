@@ -61,30 +61,17 @@ You're using multiple AI coding tools. But do you actually know:
 > cc-stats --compare --since 1w
 > ```
 
-### 🌐 Web Dashboard
+### 🖥️ Web Dashboard
 > Browser-based dark-themed dashboard — run `cc-stats-web` and open in any browser.
+> - **Multi-project filtering**: select one, several, or all projects via checkbox dropdown
+> - **Session-level drill-down**: scrollable sessions table (sorted by cost, searchable, paginated 25/page)
+> - **Project Breakdown table**: side-by-side cost/time/tokens per project (visible when 2+ projects selected)
+> - **Reorganized layout**: summary strip (Active Time · Cost · Projects) → Trend → Token + Skill Usage → collapsible Details (Dev Time, Code Changes, Tool Calls, Cache Grade) → Sessions
 
 ### 🔒 100% Local & Zero Dependencies
 > All data is read from local files. Nothing is sent over the network. Pure Python standard library — no npm, no Docker.
 
 ---
-
-## 🖼️ Screenshots
-
-<table>
-  <tr>
-    <td align="center"><strong>🌐 Web Dashboard</strong></td>
-    <td align="center"><strong>🔧 Tool Call Analytics</strong></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/cc-stat-web.png" alt="Web Dashboard" width="100%"></td>
-    <td><img src="docs/screenshots/cc-stat-tools.png" alt="Tool Call Analytics" width="100%"></td>
-  </tr>
-</table>
-
-### CLI Demo
-
-<img src="docs/screenshots/cc-stat-cli.png" width="680" alt="CC Stats CLI Demo">
 
 ---
 
@@ -124,6 +111,8 @@ cc-stats --report week        # Generate weekly Markdown report
 cc-stats --report month       # Generate monthly Markdown report
 cc-stats --compare --since 1w # Side-by-side project comparison
 cc-stats --notify <url>       # Push report to Slack / Feishu / DingTalk webhook
+cc-stats --quota              # Show usage quota forecast
+cc-stats --export-chat <id>   # Export session conversation as Markdown
 cc-stats-web                  # Open web dashboard in browser
 ```
 

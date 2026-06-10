@@ -34,7 +34,15 @@ cc-stats --last N            # Only show the most recent N sessions
 - `cc_stats/formatter.py` — Format statistics results as terminal table output
 - `cc_stats/cli.py` — argparse CLI entry point, handles file discovery and argument processing
 - `cc_stats_web/server.py` — ThreadingHTTPServer serving the web dashboard and JSON API
+  - `/api/stats` response includes `session_list` (per-session rows: date, project, duration_fmt, estimated_cost, total_tokens, lines_added, lines_removed) and `project_breakdown` (per-project aggregated rows when multiple projects are in scope)
+  - All `/api/*` endpoints accept multi-project selection via repeated `?project=` params or comma-separated values; `ApiHandler._parse_projects()` normalizes them
 - `cc_stats_web/web/index.html` — Single-file dark-themed web dashboard (vanilla JS, no build step)
+  - Checkbox dropdown for multi-project selection; source filter and time-period pills unchanged
+  - 3-card summary strip: Active Time, Est. Cost, Projects/Sessions (context-aware)
+  - Project Breakdown table (sortable, visible only for 2+ projects)
+  - Daily Trend chart, then Token Usage + Skill Usage side-by-side
+  - Collapsible "Details" section (Dev Time ring, Code Changes, Tool Calls, Cache Grade)
+  - Sessions table at bottom with search filter and 25-row pagination; Project column hidden when 1 project selected
 
 ## Key conventions
 
