@@ -63,6 +63,10 @@ You're using multiple AI coding tools. But do you actually know:
 
 ### 🌐 Web Dashboard
 > Browser-based dark-themed dashboard — run `cc-stats-web` and open in any browser.
+> - **Multi-project filtering**: select one, several, or all projects via checkbox dropdown
+> - **Session-level drill-down**: scrollable sessions table (sorted by cost, searchable, paginated 25/page)
+> - **Project Breakdown table**: side-by-side cost/time/tokens per project (visible when 2+ projects selected)
+> - **Reorganized layout**: summary strip (Active Time · Cost · Projects) → Trend → Token + Skill Usage → collapsible Details (Dev Time, Code Changes, Tool Calls, Cache Grade) → Sessions
 
 ### 🔒 100% Local & Zero Dependencies
 > All data is read from local files. Nothing is sent over the network. Pure Python standard library — no npm, no Docker.
