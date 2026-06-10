@@ -73,20 +73,6 @@ You're using multiple AI coding tools. But do you actually know:
 
 ---
 
-## 🖼️ Screenshots
-
-### CLI
-
-<img src="docs/screenshots/cc-stat-cli.png" width="680" alt="CC Stats CLI Demo">
-
-### Weekly Report
-
-<img src="docs/screenshots/cli-weekly.png" width="680" alt="Weekly Report">
-
-### Project Comparison
-
-<img src="docs/screenshots/cli-compare.png" width="680" alt="Project Comparison">
-
 ---
 
 ## ⚡ Quick Start
