@@ -155,9 +155,12 @@ def _stats_to_dict(stats: SessionStats, session_count: int = 1) -> dict:
         total = int(td.total_seconds())
         if total < 0:
             return "0s"
-        h, rem = divmod(total, 3600)
+        d, rem = divmod(total, 86400)
+        h, rem = divmod(rem, 3600)
         m, s = divmod(rem, 60)
         parts = []
+        if d:
+            parts.append(f"{d}d")
         if h:
             parts.append(f"{h}h")
         if m:
@@ -333,9 +336,12 @@ def _fmt_duration_td(td) -> str:
     total = int(td.total_seconds())
     if total < 0:
         return "0s"
-    h, rem = divmod(total, 3600)
+    d, rem = divmod(total, 86400)
+    h, rem = divmod(rem, 3600)
     m, s = divmod(rem, 60)
     parts = []
+    if d:
+        parts.append(f"{d}d")
     if h:
         parts.append(f"{h}h")
     if m:
